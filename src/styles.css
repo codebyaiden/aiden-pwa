@@ -706,3 +706,61 @@ button:active:not(:disabled) { transform: scale(.985); }
 @media (prefers-reduced-motion: reduce) {
   .bottom-nav::before, .bottom-tab, .bottom-add, .countdown-digits { transition: none !important; animation: none !important; }
 }
+
+/* v1.3: Dinero is one place with two independent ledgers. */
+.money-hub { min-width:0; }
+.money-header h1 { font-size: 28px; line-height: 1.15; letter-spacing: -.045em; margin:0 0 4px; font-weight: 720; }
+.money-header .field-hint { margin: 0 0 16px; }
+.money-switch { display:grid; grid-template-columns: 1fr 1fr; gap: 4px; padding:4px; background:rgba(28,29,33,.94); border: 1px solid var(--line); border-radius:16px; margin-bottom:20px; }
+.money-switch button { border:0; background:transparent; color:var(--text-secondary); font:inherit; font-size:14px; font-weight:600; border-radius:12px; min-height:44px; padding:8px; transition: background-color 180ms ease, color 180ms ease; }
+.money-switch button.selected { color:var(--text); background:#3A3B41; box-shadow:inset 0 1px rgba(255,255,255,.05); }
+.money-switch button:focus-visible { outline:2px solid var(--color-focus); outline-offset: 2px; }
+.money-hub .detail-heading { padding-top:0; }
+.money-hub .detail-heading .back-button { display: none; }
+.money-hub .detail-heading h1 { font-size:20px; color:var(--text-secondary); font-weight:600; }
+.money-hub .detail-overview { margin-top:12px; }
+.finance-view { min-width:0; animation:view-appear 180ms ease-out both; }
+.money-figures { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; padding:8px 0 12px; }
+.money-figures>div { min-width:0; display:flex; flex-direction:column; gap:6px; }
+.money-figures span { font-size:13px; color:var(--text-secondary); }
+.money-figures strong { font-weight:690; font-size:clamp(20px,5.5vw,27px); line-height:1.2; letter-spacing:-.035em; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.finance-net { color:var(--text-secondary); font-size:14px; border-top:1px solid var(--line); padding-top:12px; margin:0 0 6px; }
+.finance-net strong { color:var(--text); font-variant-numeric:tabular-nums; }
+.finance-view>.field-hint { margin:0; max-width:54ch; }
+.finance-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:20px; }
+.finance-actions button { min-width:0; padding-inline:8px; font-size:14px; min-height:52px; }
+.finance-section { margin-top:28px; padding-top:20px; border-top:1px solid var(--line); }
+.finance-section .section-title-row { gap:10px; align-items:center; margin-bottom:8px; }
+.finance-section h2 { font-size:18px; margin:0; }
+.finance-row { width:100%; min-height:64px; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; color:var(--text); text-align:left; border:0; border-bottom:1px solid rgba(190,192,201,.12); background:transparent; transition:background-color 120ms ease, transform 120ms ease; }
+.finance-row:last-child { border-bottom:0; }
+.finance-row-main { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; flex:1; }
+.finance-row-main strong { font-size:15px; font-weight:600; line-height:1.35; overflow-wrap:anywhere; }
+.finance-row-main small { font-size:13px; line-height:1.35; color:var(--text-secondary); }
+.finance-row-value { min-width:0; max-width:45%; display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-size:15px; font-weight:650; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; text-align:right; }
+.finance-row-value small { font-weight:400; font-size:12px; color:var(--text-secondary); }
+.month-picker-label { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-secondary); }
+.finance-month { min-width:0; width:140px; max-width:100%; min-height:44px; padding:8px; border-radius:10px; border:1px solid var(--line); color:var(--text); background:var(--surface-raised); font-size:16px; }
+.finance-recurring .field-hint { margin:0; }
+.compact-empty { margin:12px 0 0; line-height:1.5; }
+.home-finance-shortcut { margin-top:12px; width:100%; display:flex; align-items:flex-start; justify-content:space-between; text-align:left; gap:12px; border:0; border-bottom:1px solid var(--line); background:transparent; color:var(--text); padding:12px 0; min-height:52px; }
+.home-finance-shortcut>span { color:var(--text-secondary); font-size:13px; max-width:40%; }
+.home-finance-shortcut strong { font-size:14px; font-variant-numeric:tabular-nums; text-align:right; overflow-wrap:anywhere; }
+.finance-dot { color:var(--text-tertiary); padding:0 2px; }
+/* Legible rather than decorative blur. Only the dock receives glass. */
+body::before { opacity:.075; animation-duration:32s; }
+.bottom-nav { background:rgba(24,25,30,.79); border-color:rgba(246,246,250,.17); box-shadow:inset 0 1px rgba(255,255,255,.10),0 12px 24px rgba(0,0,0,.24); }
+.home-countdown { background:var(--surface); }
+@media(max-width:359px) {
+  .finance-actions { grid-template-columns:1fr; }
+  .money-switch button { font-size:13px; }
+  .finance-month { width:124px; }
+  .money-figures { gap:12px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .finance-view { animation:none; }
+  .finance-row, .money-switch button { transition:none; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  .bottom-nav { background:var(--surface-raised); }
+}

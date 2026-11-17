@@ -2,7 +2,7 @@ import { isCalendarDate } from '../savings/calculations';
 import { isISODate } from '../savings/validation';
 import { MAX_AMOUNT_COP } from '../savings/types';
 import { occurrencesForRange } from './dates';
-import type { CalendarEvent, Countdown, EventOccurrenceState, PersonalSnapshot, Task } from './types';
+import type { CalendarEvent, Countdown, EventOccurrenceState, PersonalSnapshot, Task, FinanceEntry } from './types';
 const UUID = /^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i;
 const date=(x:unknown):x is string=>typeof x==='string'&&isCalendarDate(x);
 const time=(x:unknown)=>typeof x==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(x);
@@ -47,6 +47,24 @@ export function validState(raw:unknown):raw is EventOccurrenceState{
   return validID(s.eventId)&&date(s.occurrenceStartDate)&&s.occurrenceKey===`${s.eventId}@${s.occurrenceStartDate}`
     &&['paid','received','skipped'].includes(String(s.status))&&isISODate(s.changedAt)
     &&keys(s,['occurrenceKey','eventId','occurrenceStartDate','status','changedAt']);
+}
+export function validFinanceEntry(raw:unknown):raw is FinanceEntry{
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return false;
+  const f=raw as Record<string,unknown>;
+  return validID(f.id)&&['expense','income'].includes(String(f.kind))
+    &&titled(f.title,120)&&date(f.localDate)
+    &&Number.isSafeInteger(f.amountCOP)&&Number(f.amountCOP)>0&&Number(f.amountCOP)<=MAX_AMOUNT_COP
+    &&['general','servicios','alimentacion','transporte','personal','otros'].includes(String(f.category))
+    &&(f.note===undefined||(typeof f.note==='string'&&f.note.length<=500))
+    &&(f.occurrenceKey===undefined||(typeof f.occurrenceKey==='string'&&
+      /^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}@[0-9]{4}-[0-9]{2}-[0-9]{2}$/i.test(f.occurrenceKey)))
+    &&timestamps(f)&&keys(f,['id','kind','title','amountCOP','localDate','category','note','occurrenceKey','createdAt','updatedAt']);
+}
+export function validateFinanceEntries(entries:unknown,today:string):asserts entries is FinanceEntry[]{
+  if(!Array.isArray(entries)||entries.length>20000||entries.some(e=>!validFinanceEntry(e)||e.localDate>today))throw new Error('La copia contiene gastos o ingresos inválidos.');
+  if(new Set(entries.map(e=>e.id)).size!==entries.length)throw new Error('Hay registros financieros duplicados.');
+  const links=entries.filter(e=>e.occurrenceKey).map(e=>e.occurrenceKey);
+  if(new Set(links).size!==links.length)throw new Error('Una ocurrencia tiene dos registros reales.');
 }
 export function validatePersonalCollections(input:Pick<PersonalSnapshot,'events'|'tasks'|'countdowns'|'eventOccurrenceStates'>):void{
   const limits:[[unknown[],number,(x:unknown)=>boolean,string],...Array<[unknown[],number,(x:unknown)=>boolean,string]>]=[

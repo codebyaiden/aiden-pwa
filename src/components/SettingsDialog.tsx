@@ -45,18 +45,18 @@ export function SettingsDialog({ data, onClose, onRestore }: { data: PersonalSna
   return <Modal title="Ajustes y copias" onClose={onClose} busy={busy} wide>
     <div className="backup-section">
       <h3>Guardar una copia</h3>
-      <p>Tus ahorros, eventos, tareas y countdowns se guardan localmente. GitHub Pages no los respalda.</p>
+      <p>Tus ahorros, gastos reales, eventos, tareas y countdowns se guardan localmente. GitHub Pages no los respalda.</p>
       <button className="button-secondary" type="button" onClick={exportNow} disabled={busy}><Icon name="download" /> Exportar copia</button>
       <button className="text-action" type="button" onClick={() => { void shareNow(); }} disabled={busy}>Compartir archivo…</button>
     </div>
     <div className="section-divider" />
     <div className="backup-section">
       <h3>Restaurar desde un archivo</h3>
-      <p>Una copia v3 reemplaza todos tus datos. Una copia antigua v1/v2 reemplaza solo los ahorros y conserva la agenda, tareas y countdowns.</p>
+      <p>Una copia v4 reemplaza todos los datos. Una v3 restaura la agenda y ahorros, pero conserva los gastos reales (desvinculando sus vencimientos). Una copia antigua v1/v2 reemplaza solo los ahorros y conserva la agenda, tareas y countdowns.</p>
       <input ref={fileInput} className="sr-only" id="backup-file" type="file" accept=".json,application/json" onChange={(e) => { void chooseFile(e); }} />
       <button className="button-secondary" type="button" disabled={busy} onClick={() => fileInput.current?.click()}><Icon name="upload" /> Importar copia</button>
       {backup && info && <div className="backup-preview" aria-label="Resumen de la copia">
-        <p><strong>{backup.kind === 'full' ? 'Copia integral v3 validada' : 'Copia de ahorros v1/v2 validada'}</strong></p>
+        <p><strong>{backup.kind === 'full' ? 'Copia integral validada' : 'Copia de ahorros v1/v2 validada'}</strong></p>
         <dl><div><dt>Movimientos</dt><dd>{info.movements}</dd></div><div><dt>Saldo</dt><dd>{formatCOP(info.total)}</dd></div><div><dt>Plan mensual</dt><dd>{(backup.kind === 'full' ? backup.data : backup.savings).settings.monthlyPlanCOP === null ? 'Sin configurar' : formatCOP((backup.kind === 'full' ? backup.data : backup.savings).settings.monthlyPlanCOP!)}</dd></div><div><dt>Meta final</dt><dd>{(backup.kind === 'full' ? backup.data : backup.savings).settings.finalGoalCOP === null ? 'Sin configurar' : formatCOP((backup.kind === 'full' ? backup.data : backup.savings).settings.finalGoalCOP!)}</dd></div></dl>
         {backup.kind==='full' && <p className="field-hint">{info.events} eventos · {info.tasks} tareas · {info.countdowns} countdowns</p>}
         <p className="backup-warning">{backup.kind === 'full' ? 'Se reemplazarán todos los datos actuales. Exporta una copia antes de continuar.' : 'Solo se reemplazarán los ahorros. Calendario, tareas y countdowns permanecerán intactos.'}</p>
