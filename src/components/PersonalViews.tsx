@@ -1,6 +1,6 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
 import { balance,formatCOP,monthTotals,projection,formatMonth } from '../savings/calculations';
-import { addDays, countdownText, dayDifference, financialReminders, localDateLabel, monthCells, occurrencesForRange, occurrencesOnDay, resolveCountdown } from '../personal/dates';
+import { addDays, countdownText, dayDifference, financialReminders, localDateLabel, monthCells, occurrencesForRange, resolveCountdown } from '../personal/dates';
 import type { CalendarEvent,Countdown,EventOccurrenceState,Occurrence,PersonalSnapshot,Task } from '../personal/types';
 import { AnimatedMoney,Icon } from './Shared';
 import { StreakIndicator } from './SavingsInsights';

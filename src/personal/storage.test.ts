@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach,describe,expect,it } from 'vitest';
-import {bogotaToday,balance} from '../savings/calculations';
+import {balance} from '../savings/calculations';
 import {loadSnapshot,saveFinalGoal,saveMonthlyPlan,saveMovement,restoreSnapshot} from '../savings/storage';
 import type { Movement } from '../savings/types';
 import {createPersonalBackup,parsePersonalBackup} from './backup';
