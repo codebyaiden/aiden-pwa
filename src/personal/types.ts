@@ -21,13 +21,24 @@ export interface Countdown {
   id: string; title: string; targetDate?: string; targetTime?: string;
   sourceEventId?: string; pinned: boolean; createdAt: string; updatedAt: string;
 }
+export type FinanceKind = 'expense' | 'income';
+export interface FinanceEntry {
+  id: string; kind: FinanceKind; title: string; amountCOP: number;
+  localDate: string; category: 'general' | 'servicios' | 'alimentacion' | 'transporte' | 'personal' | 'otros';
+  note?: string; occurrenceKey?: string;
+  createdAt: string; updatedAt: string;
+}
 export interface PersonalSnapshot extends Snapshot {
   events: CalendarEvent[];
   eventOccurrenceStates: EventOccurrenceState[];
   tasks: Task[];
   countdowns: Countdown[];
+  financeEntries: FinanceEntry[];
 }
-export interface BackupV3 extends PersonalSnapshot {
+export interface BackupV3 extends Omit<PersonalSnapshot, 'financeEntries'> {
   format: 'aiden.personal.backup'; version: 3; exportedAt: string;
+}
+export interface BackupV4 extends PersonalSnapshot {
+  format: 'aiden.personal.backup'; version: 4; exportedAt: string;
 }
 export type Occurrence = { event: CalendarEvent; startDate: string; endDate: string; key: string };

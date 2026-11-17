@@ -13,10 +13,10 @@ export function QuickAdd({onClose,onChoose}:{onClose:()=>void;onChoose:(which:'m
     {([['money','Añadir dinero','Aporte a la alcancía'],['event','Evento','Cita, pago o ingreso'],['task','Tarea','Algo por hacer'],['countdown','Countdown','Una fecha importante']] as const).map(([key,label,detail])=><button type="button" key={key} onClick={()=>onChoose(key)} className="quick-menu-item"><span><strong>{label}</strong><small>{detail}</small></span><span aria-hidden="true">＋</span></button>)}
   </div></Modal>;
 }
-export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onState,onClose,currentState}: {
+export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onState,onRecord,onClose,currentState}: {
  event?:CalendarEvent;occurrence?:Occurrence;initialDate:string;currentState?:EventOccurrenceState;
  onSave:(e:CalendarEvent,mode:'add'|'edit')=>Promise<void>;onDelete:(e:CalendarEvent)=>Promise<void>;
- onState:(e:EventOccurrenceState|null,eventId:string,startDate:string)=>Promise<void>;onClose:()=>void;
+ onState:(e:EventOccurrenceState|null,eventId:string,startDate:string)=>Promise<void>;onRecord?:()=>void;onClose:()=>void;
 }){
   const stableId=useRef(event?.id??crypto.randomUUID());const createdAt=useRef(event?.createdAt??nowISO());
   const [title,setTitle]=useState(event?.title??'');const [category,setCategory]=useState<CalendarEvent['category']>(event?.category??'personal');
@@ -38,7 +38,7 @@ export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onStat
     gate.current=true;setBusy(true);setError('');try{await onSave(next,event?'edit':'add');}catch(err){setError(errorText(err));}finally{gate.current=false;setBusy(false);}
   }
   async function remove(){if(!event||gate.current)return;
-    if(!window.confirm('¿Eliminar la serie completa? Se borrarán sus pagos confirmados. Los countdowns vinculados conservarán su fecha como manual. No se puede deshacer.'))return;
+    if(!window.confirm('¿Eliminar la serie completa? Se quitarán sus confirmaciones del calendario; los registros de dinero real se conservarán. Los countdowns vinculados conservarán su fecha como manual. No se puede deshacer.'))return;
     gate.current=true;setBusy(true);setError('');try{await onDelete(event);}catch(err){setError(errorText(err));}finally{gate.current=false;setBusy(false);}
   }
   async function mark(status:'paid'|'received'|'skipped'|null){if(!event||!occurrence||gate.current)return;
@@ -50,7 +50,8 @@ export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onStat
       <p>{event.category==='expense'?'Pago':event.category==='income'?'Ingreso':'Personal'}{event.amountCOP?` · ${formatCOP(event.amountCOP)}`:''}{event.recurrence!=='none'?` · Serie ${event.recurrence==='weekly'?'semanal':event.recurrence==='monthly'?'mensual':'anual'}`:''}</p>
       {event.notes&&<p className="field-hint">{event.notes}</p>}
       {event.category!=='personal'&&occurrence&&<div className="status-actions"><p className="field-hint">{currentState?`Estado: ${currentState.status==='paid'?'Pagado':currentState.status==='received'?'Recibido':'Omitido'}`:event.category==='expense'?'Pago pendiente':'Por recibir'}</p>
-        <button className="button-primary" type="button" disabled={busy||currentState?.status===(event.category==='expense'?'paid':'received')} onClick={()=>void mark(event.category==='expense'?'paid':'received')}>{event.category==='expense'?'Marcar pagado':'Marcar recibido'}</button>
+        {onRecord&&<button className="button-primary" type="button" disabled={busy} onClick={onRecord}>{event.category==='expense'?'Registrar pago real':'Registrar ingreso real'}</button>}
+        <button className="button-secondary" type="button" disabled={busy||currentState?.status===(event.category==='expense'?'paid':'received')} onClick={()=>void mark(event.category==='expense'?'paid':'received')}>{event.category==='expense'?'Marcar pagado sin registrar gasto':'Marcar recibido sin registrar ingreso'}</button>
         {currentState&&<button className="button-secondary" type="button" disabled={busy} onClick={()=>void mark(null)}>Volver a pendiente</button>}
         {!currentState&&<button className="text-action" type="button" disabled={busy} onClick={()=>void mark('skipped')}>Omitir esta ocurrencia</button>}
       </div>}

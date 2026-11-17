@@ -1,4 +1,5 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
+import { financeTotals } from '../personal/finance';
 import { balance,formatCOP,monthTotals,projection,formatMonth } from '../savings/calculations';
 import { addDays, countdownText, dayDifference, financialReminders, localDateLabel, monthCells, occurrencesForRange, resolveCountdown } from '../personal/dates';
 import type { CalendarEvent,Countdown,EventOccurrenceState,Occurrence,PersonalSnapshot,Task } from '../personal/types';
@@ -91,8 +92,8 @@ export function TasksView({tasks,today,onOpen,onAdd,onToggle}:{tasks:Task[];toda
     {done.length>0&&<details className="task-group done-group"><summary>Completadas ({done.length})</summary>{rows(done)}</details>}
   </div>;
 }
-export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpenEvent,onOpenTask,onTaskToggle,onCalendar,onTasks,onCountdown,onAddCountdown}:{
- data:PersonalSnapshot;today:string;streakCelebrate:boolean;onSavings:()=>void;onAddEvent:()=>void;onOpenEvent:(o:Occurrence)=>void;onOpenTask:(t:Task)=>void;onTaskToggle:(t:Task)=>void;onCalendar:()=>void;onTasks:()=>void;onCountdown:(c:Countdown)=>void;onAddCountdown:()=>void;
+export function HomeView({data,today,streakCelebrate,onSavings,onFinance,onAddEvent,onOpenEvent,onOpenTask,onTaskToggle,onCalendar,onTasks,onCountdown,onAddCountdown}:{
+ data:PersonalSnapshot;today:string;streakCelebrate:boolean;onSavings:()=>void;onFinance:()=>void;onAddEvent:()=>void;onOpenEvent:(o:Occurrence)=>void;onOpenTask:(t:Task)=>void;onTaskToggle:(t:Task)=>void;onCalendar:()=>void;onTasks:()=>void;onCountdown:(c:Countdown)=>void;onAddCountdown:()=>void;
 }){
   const [now,setNow]=useState(()=>new Date());const pinned=data.countdowns.find(c=>c.pinned);
   const target=pinned?resolveCountdown(pinned,data.events):null;
@@ -108,17 +109,19 @@ export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpen
     .filter(o=>o.endDate>=today).filter((o,i,arr)=>arr.findIndex(x=>x.key===o.key)===i);
   const reminders=financialReminders(data.events,data.eventOccurrenceStates,today).filter(o=>o.startDate<today);
   const visible=[...reminders,...events].filter((o,i,arr)=>arr.findIndex(x=>x.key===o.key)===i).sort((a,b)=>a.startDate.localeCompare(b.startDate)||Number(b.event.important)-Number(a.event.important)).slice(0,5);
+  const finance=financeTotals(data.financeEntries,today.slice(0,7));
   const tasks=data.tasks.filter(t=>!t.completedAt).sort((a,b)=>(a.dueDate??'9999-12-31').localeCompare(b.dueDate??'9999-12-31')).slice(0,3);
   return <div className="view-panel home-view">
     <button className="home-savings-hit" type="button" onClick={onSavings} aria-label="Abrir ahorros"><div className="home-savings-top"><span>En mi alcancía</span><span className="home-savings-arrow">↗</span></div><div className="home-balance"><AnimatedMoney value={balance(data.movements)} /></div><div className="home-savings-stats"><span>Aportado este mes <strong>{formatCOP(monthTotals(data.movements,today.slice(0,7)).deposited)}</strong></span><span>Julio de 2029 <strong>{projection(data.movements,data.settings,today)===null?'Sin plan':formatCOP(projection(data.movements,data.settings,today)!)}</strong></span></div></button>
+    {data.financeEntries.length>0&&<button type="button" className="home-finance-shortcut" onClick={onFinance}><span>Gastos e ingresos · este mes</span><strong>− {formatCOP(finance.spent)} <span className="finance-dot" aria-hidden="true">·</span> + {formatCOP(finance.received)}</strong></button>}
     <StreakIndicator movements={data.movements} today={today} celebrate={streakCelebrate} compact />
     {pinned&&target&&<section className="home-countdown"><div className="countdown-heading"><span className="eyebrow">Cuenta regresiva</span><button type="button" className="text-action" onClick={()=>onCountdown(pinned)}>Editar</button></div><h2 className="countdown-name">{pinned.title}</h2><CountdownDisplay value={countdownText(target.date,target.time,today,now)}/><p className="countdown-date">{localDateLabel(target.date,{day:'numeric',month:'long',year:'numeric'})}{target.time?` · ${target.time}`:''}</p></section>}
     <section className={`home-agenda ${visible.length===0?'home-empty':''}`}>{visible.length>0&&<div className="section-title-row"><h2>Próximos</h2><button className="text-action" onClick={onCalendar}>Ver calendario</button></div>}
       {visible.length===0?<div className="empty-inline"><p>Sin planes próximos.</p><button className="text-action" onClick={onAddEvent}>Añadir evento</button></div>:visible.map(o=><div key={o.key} className="home-upcoming"><span className="home-upcoming-date">{o.event.category==='expense'&&o.startDate<today?'Vencido':o.event.category==='expense'&&o.startDate===today?'Pagar hoy':o.event.category==='expense'&&dayDifference(today,o.startDate)===1?'Mañana':o.event.category==='expense'&&dayDifference(today,o.startDate)===3?'En 3 días':localDateLabel(o.startDate,{day:'numeric',month:'short'})}</span><button className="home-upcoming-info" onClick={()=>onOpenEvent(o)}><strong>{o.event.title}</strong><small>{categoryName(o.event.category)}{o.event.amountCOP?` · ${formatCOP(o.event.amountCOP)}`:''}{o.event.category==='income'?' · Por recibir':''}</small></button></div>)}
     </section>
-    <section className={`home-tasks ${tasks.length===0?'home-empty':''}`}>{tasks.length>0&&<div className="section-title-row"><h2>Tareas</h2><button className="text-action" onClick={onTasks}>Ver todas</button></div>}
+    {(tasks.length>0||visible.length>0)&&<section className={`home-tasks ${tasks.length===0?'home-empty':''}`}>{tasks.length>0&&<div className="section-title-row"><h2>Tareas</h2><button className="text-action" onClick={onTasks}>Ver todas</button></div>}
       {tasks.length===0?<div className="empty-inline"><p>Todo al día.</p><button className="text-action" onClick={onTasks}>Ver tareas</button></div>:tasks.map(t=><div className="task-row" key={t.id}><label className="task-checkbox"><input aria-label={`Completar ${t.title}`} type="checkbox" checked={false} onChange={()=>onTaskToggle(t)}/></label><button className="task-row-body" onClick={()=>onOpenTask(t)}><strong>{t.title}</strong>{t.dueDate&&<small>{localDateLabel(t.dueDate,{day:'numeric',month:'short'})}</small>}</button></div>)}
-    </section>
+    </section>}
     {data.countdowns.length>0&&!pinned&&<button type="button" className="quiet-link" onClick={()=>onCountdown(data.countdowns[0])}>Gestionar countdowns</button>}
     {data.countdowns.length===0&&<button type="button" className="quiet-link" onClick={onAddCountdown}>Crear countdown</button>}
   </div>;

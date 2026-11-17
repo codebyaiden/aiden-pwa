@@ -1,4 +1,4 @@
-# aiden. · agenda y ahorros PWA v1.2
+# aiden. · agenda y finanzas personales PWA v1.3
 
 PWA personal para billetes guardados en una alcancía. React + TypeScript + Vite, IndexedDB local, sin backend ni sincronización. No contiene datos de ejemplo.
 
@@ -31,3 +31,13 @@ Prueba en el iPhone real: instalar desde Safari, guardar/reabrir con modo avión
 - Respaldo integral `aiden.personal.backup` v3. Al importar una copia de ahorro v1/v2, solo se reemplazan los movimientos y los ajustes financieros, conservando agenda/tareas/countdowns.
 
 **iPhone:** guardar la copia JSON antes de actualizar; comprobar la migración, teclado, offline y la instalación real. GitHub Pages no sincroniza ni respalda los datos locales. Una PWA estática no puede garantizar notificaciones del sistema con la aplicación cerrada.
+
+
+## v1.3: Dinero personal
+
+- **Dinero** separa Alcancía y Gastos e ingresos. No existe saldo bancario inferido.
+- Los gastos e ingresos reales usan un nuevo store `financeEntries` en IndexedDB `aiden-savings` v4. Los datos previos se conservan. Las cifras mensuales se calculan del registro real, no del calendario.
+- Los vencimientos del calendario siguen siendo previstos. Un registro real vinculado marca esa ocurrencia como pagada/recibida en el mismo commit, sin crear depósitos ni retiros en Alcancía. Una ocurrencia solo puede tener un registro real.
+- Los registros reales sobreviven a la eliminación de una serie, pero pierden su vínculo con el evento.
+- Backup integral `aiden.personal.backup` v4. Una importación v3 conserva los registros reales actuales y les retira los vínculos de calendario; las copias de ahorros v1/v2 preservan la agenda y los registros de gastos/ingresos.
+- Hay un documento opcional `VPS_HANDOFF.md` para un futuro servicio de Web Push. **v1.3 no instala backend ni ofrece push**, solo avisos dentro de la PWA al abrirla.

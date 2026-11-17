@@ -76,7 +76,7 @@ describe('IndexedDB real por transacción (fake-indexeddb)', () => {
 });
 
 describe('v1.1 IndexedDB upgrade and data integrity', () => {
-  it('v1 database upgrades to v3 preserving saved movements and monthly plan', async () => {
+  it('v1 database upgrades to v4 preserving saved movements and monthly plan', async () => {
     const movement = createMovement(30000);
     await new Promise<void>((resolve, reject) => {
       const opening = indexedDB.open('aiden-savings', 1);
@@ -92,7 +92,7 @@ describe('v1.1 IndexedDB upgrade and data integrity', () => {
     expect(balance(result.movements)).toBe(30000);
     expect(result.settings).toEqual({ schemaVersion: 2, monthlyPlanCOP: 150000, finalGoalCOP: null, targetEndMonth: '2029-07' });
     const onDisk = await new Promise<unknown>((resolve, reject) => {
-      const opening = indexedDB.open('aiden-savings', 3);
+      const opening = indexedDB.open('aiden-savings', 4);
       opening.onsuccess = () => {
         const db = opening.result;
         const req = db.transaction('settings').objectStore('settings').get('current');

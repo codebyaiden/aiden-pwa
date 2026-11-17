@@ -3,9 +3,9 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { bogotaToday, formatCOP, savingsStreak } from './savings/calculations';
 import type { Movement, MovementType } from './savings/types';
 import { removeMovement, restoreSnapshot, saveFinalGoal, saveMonthlyPlan, saveMovement } from './savings/storage';
-import type { CalendarEvent,Countdown,EventOccurrenceState,Occurrence,PersonalSnapshot,Task } from './personal/types';
+import type { CalendarEvent,Countdown,EventOccurrenceState,Occurrence,PersonalSnapshot,Task,FinanceEntry,FinanceKind } from './personal/types';
 import type { ParsedBackup } from './personal/backup';
-import { loadPersonalSnapshot,removeCountdown,removeEvent,removeTask,restoreFullBackup,saveCountdown,saveEvent,saveOccurrenceState,saveTask } from './personal/storage';
+import { loadPersonalSnapshot,removeCountdown,removeEvent,removeTask,removeFinanceEntry,restoreFullBackup,saveCountdown,saveEvent,saveFinanceEntry,saveOccurrenceState,saveTask } from './personal/storage';
 import { AddMovementDialog } from './components/AddMovementDialog';
 import { PlanDialog } from './components/PlanDialog';
 import { GoalDialog } from './components/GoalDialog';
@@ -13,17 +13,19 @@ import { SavingsDetail } from './components/SavingsDetail';
 import { SettingsDialog } from './components/SettingsDialog';
 import { Icon, Modal } from './components/Shared';
 import { CountdownDialog, EventDialog, QuickAdd, TaskDialog } from './components/PersonalDialogs';
+import { FinanceView, FinanceDialog } from './components/FinanceView';
 import { CalendarView, HomeView, TasksView, type Filter } from './components/PersonalViews';
 
 type Tab='home'|'calendar'|'savings'|'tasks';
-const tabFromHash=(hash:string):Tab=>hash==='#alcancia'||hash==='#ahorros'?'savings':hash==='#calendario'?'calendar':hash==='#tareas'?'tasks':'home';
+const tabFromHash=(hash:string):Tab=>hash==='#alcancia'||hash==='#ahorros'||hash==='#dinero'||hash==='#gastos'?'savings':hash==='#calendario'?'calendar':hash==='#tareas'?'tasks':'home';
 const tabHash=(tab:Tab)=>tab==='savings'?'#alcancia':tab==='calendar'?'#calendario':tab==='tasks'?'#tareas':'#inicio';
 type Overlay=
  |{kind:'movement';type:MovementType;movement?:Movement}|{kind:'detail';movement:Movement}
  |{kind:'plan'|'goal'|'settings'|'quick'}
  |{kind:'event';event?:CalendarEvent;occurrence?:Occurrence;date:string}
  |{kind:'task';task?:Task;date?:string}
- |{kind:'countdown';countdown?:Countdown};
+ |{kind:'countdown';countdown?:Countdown}
+ |{kind:'finance';direction:FinanceKind;entry?:FinanceEntry;occurrence?:Occurrence};
 const nowISO=()=>new Date().toISOString();
 function TabIcon({tab}:{tab:Tab}){
   const shapes:Record<Tab,ReactNode>={
@@ -39,6 +41,7 @@ export default function App(){
   const [snapshot,setSnapshot]=useState<PersonalSnapshot|null>(null);
   const [loadError,setLoadError]=useState('');const [today,setToday]=useState(bogotaToday);
   const [tab,setTab]=useState<Tab>(()=>tabFromHash(location.hash));
+  const [moneyPane,setMoneyPane]=useState<'savings'|'finance'>('savings');
   const [calendarMonth,setCalendarMonth]=useState(()=>bogotaToday().slice(0,7));
   const [selectedDay,setSelectedDay]=useState(bogotaToday);
   const [calendarFilter,setCalendarFilter]=useState<Filter>('all');
@@ -55,7 +58,7 @@ export default function App(){
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{
-    const handler=()=>setTab(tabFromHash(location.hash));window.addEventListener('hashchange',handler);
+    const handler=()=>{setTab(tabFromHash(location.hash));if(location.hash==='#gastos')setMoneyPane('finance');};window.addEventListener('hashchange',handler);
     return()=>window.removeEventListener('hashchange',handler);
   },[]);
   useEffect(()=>{
@@ -88,8 +91,8 @@ export default function App(){
   async function savePlan(value:number|null){await commitAndRefresh(()=>saveMonthlyPlan(value));setOverlay(null);setMessage('Plan guardado');}
   async function saveGoal(value:number|null){await commitAndRefresh(()=>saveFinalGoal(value));setOverlay(null);setMessage(value===null?'Meta eliminada':'Meta guardada');}
   async function restore(backup:ParsedBackup){
-    await commitAndRefresh(()=>backup.kind==='full'?restoreFullBackup(backup.data):restoreSnapshot(backup.savings));
-    setNewId(null);setOverlay(null);setMessage(backup.kind==='full'?'Copia completa restaurada':'Ahorros restaurados; agenda conservada');
+    await commitAndRefresh(()=>backup.kind==='full'?restoreFullBackup(backup.data,backup.preserveFinance):restoreSnapshot(backup.savings));
+    setNewId(null);setOverlay(null);setMessage(backup.kind==='full'?'Copia restaurada':'Ahorros restaurados; agenda conservada');
   }
   async function remove(m:Movement){if(removing)return;setRemoving(true);setRemoveError('');try{await commitAndRefresh(()=>removeMovement(m.id));setOverlay(null);setNewId(null);setMessage('Movimiento eliminado');}catch(e){setRemoveError(e instanceof Error?e.message:'No se pudo eliminar.');}finally{setRemoving(false);}}
   async function saveCalendarEvent(next:CalendarEvent,mode:'add'|'edit'){
@@ -98,6 +101,16 @@ export default function App(){
   async function deleteCalendarEvent(e:CalendarEvent){await commitAndRefresh(()=>removeEvent(e.id));setOverlay(null);setMessage('Serie eliminada');}
   async function saveCalendarState(next:EventOccurrenceState|null,id:string,start:string){
     await commitAndRefresh(()=>saveOccurrenceState(next,id,start));setOverlay(null);setMessage(next?'Estado guardado':'Pendiente otra vez');
+  }
+  async function saveRealFinance(next:FinanceEntry,mode:'add'|'edit'){
+    await commitAndRefresh(()=>saveFinanceEntry(next,mode));setOverlay(null);setMessage(mode==='edit'?'Registro actualizado':next.kind==='expense'?'Gasto guardado':'Ingreso guardado');
+  }
+  async function deleteRealFinance(next:FinanceEntry){
+    await commitAndRefresh(()=>removeFinanceEntry(next.id));setOverlay(null);setMessage('Registro eliminado');
+  }
+  function openRealFinance(o:Occurrence){
+    const existing=snapshot?.financeEntries.find(e=>e.occurrenceKey===o.key);
+    setOverlay({kind:'finance',direction:o.event.category==='expense'?'expense':'income',occurrence:o,entry:existing});
   }
   async function savePersonalTask(next:Task,mode:'add'|'edit'){await commitAndRefresh(()=>saveTask(next,mode));setOverlay(null);setMessage('Tarea guardada');}
   async function deletePersonalTask(t:Task){await commitAndRefresh(()=>removeTask(t.id));setOverlay(null);setMessage('Tarea eliminada');}
@@ -113,14 +126,18 @@ export default function App(){
     <header className="app-header"><div><button type="button" className="wordmark" onClick={()=>navigate('home')} aria-label="Ir a Inicio">aiden<span>.</span></button><p className="header-date">{label}</p></div><button type="button" className="icon-button settings-button" aria-label="Ajustes y copias de seguridad" disabled={!snapshot} onClick={()=>setOverlay({kind:'settings'})}><Icon name="settings"/></button></header>
     <main id="main-content">{loadError?<section role="alert" className="load-error"><h1>No pudimos leer tus datos</h1><p>{loadError}</p><p>No se ha borrado ningún registro.</p><button className="button-primary" onClick={()=>void refresh()}>Reintentar</button></section>
       :!snapshot?<p role="status" className="loading-label">Cargando datos locales…</p>
-      :tab==='home'?<HomeView data={snapshot} today={today} streakCelebrate={streakCelebrate} onSavings={()=>navigate('savings')} onCalendar={()=>navigate('calendar')} onTasks={()=>navigate('tasks')} onAddEvent={()=>setOverlay({kind:'event',date:today})} onOpenEvent={o=>setOverlay({kind:'event',event:o.event,occurrence:o,date:o.startDate})} onOpenTask={task=>setOverlay({kind:'task',task})} onTaskToggle={t=>void toggleTask(t)} onCountdown={countdown=>setOverlay({kind:'countdown',countdown})} onAddCountdown={()=>setOverlay({kind:'countdown'})}/>
+      :tab==='home'?<HomeView data={snapshot} today={today} streakCelebrate={streakCelebrate} onSavings={()=>{setMoneyPane('savings');navigate('savings');}} onFinance={()=>{setMoneyPane('finance');navigate('savings');}} onCalendar={()=>navigate('calendar')} onTasks={()=>navigate('tasks')} onAddEvent={()=>setOverlay({kind:'event',date:today})} onOpenEvent={o=>setOverlay({kind:'event',event:o.event,occurrence:o,date:o.startDate})} onOpenTask={task=>setOverlay({kind:'task',task})} onTaskToggle={t=>void toggleTask(t)} onCountdown={countdown=>setOverlay({kind:'countdown',countdown})} onAddCountdown={()=>setOverlay({kind:'countdown'})}/>
       :tab==='calendar'?<CalendarView data={snapshot} today={today} month={calendarMonth} onMonth={setCalendarMonth} selected={selectedDay} onSelect={setSelectedDay} filter={calendarFilter} onFilter={setCalendarFilter} onAddEvent={date=>setOverlay({kind:'event',date})} onOpenEvent={o=>setOverlay({kind:'event',event:o.event,occurrence:o,date:o.startDate})} onOpenTask={task=>setOverlay({kind:'task',task})} onTaskToggle={t=>void toggleTask(t)} onOpenCountdown={countdown=>setOverlay({kind:'countdown',countdown})} onAddCountdown={()=>setOverlay({kind:'countdown'})}/>
-      :tab==='savings'?<div className="view-panel"><SavingsDetail data={snapshot} today={today} newlySavedId={newId} onBack={()=>navigate('home')} onAdd={()=>setOverlay({kind:'movement',type:'deposit'})} onWithdraw={()=>setOverlay({kind:'movement',type:'withdrawal'})} onPlan={()=>setOverlay({kind:'plan'})} onGoal={()=>setOverlay({kind:'goal'})} streakCelebrate={streakCelebrate} onSelect={movement=>{setRemoveError('');setOverlay({kind:'detail',movement});}}/></div>
+      :tab==='savings'?<div className="view-panel money-hub"><div className="money-header"><h1>Dinero</h1><p className="field-hint">Alcancía y movimientos personales, por separado.</p></div><div className="money-switch" role="group" aria-label="Sección de Dinero">
+        <button className={moneyPane==='savings'?'selected':''} aria-pressed={moneyPane==='savings'} onClick={()=>setMoneyPane('savings')} type="button">Alcancía</button>
+        <button className={moneyPane==='finance'?'selected':''} aria-pressed={moneyPane==='finance'} onClick={()=>setMoneyPane('finance')} type="button">Gastos e ingresos</button>
+      </div>{moneyPane==='savings'?<SavingsDetail data={snapshot} today={today} newlySavedId={newId} onBack={()=>navigate('home')} onAdd={()=>setOverlay({kind:'movement',type:'deposit'})} onWithdraw={()=>setOverlay({kind:'movement',type:'withdrawal'})} onPlan={()=>setOverlay({kind:'plan'})} onGoal={()=>setOverlay({kind:'goal'})} streakCelebrate={streakCelebrate} onSelect={movement=>{setRemoveError('');setOverlay({kind:'detail',movement});}}/>:
+      <FinanceView data={snapshot} today={today} onAdd={direction=>setOverlay({kind:'finance',direction})} onEdit={entry=>setOverlay({kind:'finance',entry,direction:entry.kind})} onOpenOccurrence={openRealFinance}/>}</div>
       :<TasksView tasks={snapshot.tasks} today={today} onOpen={task=>setOverlay({kind:'task',task})} onAdd={()=>setOverlay({kind:'task'})} onToggle={t=>void toggleTask(t)}/>}
     </main>
     {snapshot&&!overlay&&<nav className={`bottom-nav nav-${tab}`} aria-label="Navegación principal">{(['home','calendar'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='home'?'Inicio':'Calendario'}</span></button>)}
       <button className="bottom-add" type="button" aria-label="Añadir" onClick={()=>setOverlay({kind:'quick'})}><Icon name="plus"/></button>
-      {(['savings','tasks'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='savings'?'Ahorros':'Tareas'}</span></button>)}</nav>}
+      {(['savings','tasks'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='savings'?'Dinero':'Tareas'}</span></button>)}</nav>}
     {needRefresh&&!overlay&&<aside className="update-banner"><span>Hay una versión nueva.</span><button type="button" className="text-action" onClick={()=>void updateServiceWorker(true)}>Actualizar</button></aside>}
     <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{message}</div>{message&&<div className="toast">{message}</div>}
     {snapshot&&overlay?.kind==='quick'&&<QuickAdd onClose={()=>setOverlay(null)} onChoose={which=>setOverlay(which==='money'?{kind:'movement',type:'deposit'}:which==='event'?{kind:'event',date:today}:which==='task'?{kind:'task'}:{kind:'countdown'})}/>}
@@ -128,7 +145,8 @@ export default function App(){
     {snapshot&&overlay?.kind==='goal'&&<GoalDialog current={snapshot.settings.finalGoalCOP} onClose={()=>setOverlay(null)} onSave={saveGoal}/>}
     {snapshot&&overlay?.kind==='plan'&&<PlanDialog current={snapshot.settings.monthlyPlanCOP} onClose={()=>setOverlay(null)} onSave={savePlan}/>}
     {snapshot&&overlay?.kind==='settings'&&<SettingsDialog data={snapshot} onClose={()=>setOverlay(null)} onRestore={restore}/>}
-    {snapshot&&overlay?.kind==='event'&&<EventDialog key={overlay.event?.id??'new-event'} event={selectedEvent} occurrence={overlay.occurrence} initialDate={overlay.date} currentState={snapshot.eventOccurrenceStates.find(s=>s.occurrenceKey===overlay.occurrence?.key)} onSave={saveCalendarEvent} onDelete={deleteCalendarEvent} onState={saveCalendarState} onClose={()=>setOverlay(null)}/>}
+    {snapshot&&overlay?.kind==='event'&&<EventDialog key={overlay.event?.id??'new-event'} event={selectedEvent} occurrence={overlay.occurrence} initialDate={overlay.date} currentState={snapshot.eventOccurrenceStates.find(s=>s.occurrenceKey===overlay.occurrence?.key)} onSave={saveCalendarEvent} onDelete={deleteCalendarEvent} onState={saveCalendarState} onRecord={overlay.occurrence?()=>openRealFinance(overlay.occurrence!):undefined} onClose={()=>setOverlay(null)}/>}
+    {snapshot&&overlay?.kind==='finance'&&<FinanceDialog key={overlay.entry?.id??overlay.occurrence?.key??overlay.direction} data={snapshot} today={today} entry={overlay.entry} occurrence={overlay.occurrence} kind={overlay.direction} onSave={saveRealFinance} onDelete={deleteRealFinance} onClose={()=>setOverlay(null)}/>}
     {snapshot&&overlay?.kind==='task'&&<TaskDialog key={overlay.task?.id??'new-task'} task={selectedTask} initialDate={overlay.date} onSave={savePersonalTask} onDelete={deletePersonalTask} onClose={()=>setOverlay(null)}/>}
     {snapshot&&overlay?.kind==='countdown'&&<CountdownDialog key={overlay.countdown?.id??'new-countdown'} countdown={selectedCountdown} events={snapshot.events} onSave={savePersonalCountdown} onDelete={deletePersonalCountdown} onClose={()=>setOverlay(null)}/>}
     {snapshot&&overlay?.kind==='detail'&&selectedMovement&&<Modal title="Detalle del movimiento" onClose={()=>setOverlay(null)} busy={removing}>

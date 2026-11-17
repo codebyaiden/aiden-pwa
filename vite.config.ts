@@ -19,7 +19,7 @@ export default defineConfig({
         id: base,
         name: 'aiden.',
         short_name: 'aiden',
-        description: 'Agenda personal, calendario, tareas y ahorros sin conexión.',
+        description: 'Agenda, dinero personal, tareas y ahorros sin conexión.',
         start_url: base,
         scope: base,
         display: 'standalone',

@@ -13,7 +13,7 @@ function countdown(p:Partial<Countdown>={}):Countdown{return {id:crypto.randomUU
 async function reset(){await new Promise<void>((resolve,reject)=>{const r=indexedDB.deleteDatabase('aiden-savings');r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
 beforeEach(reset);
 describe('migración y datos persistentes',()=>{
- it('v2 pasa a v3 sin tocar montos, id, meta ni plan',async()=>{
+ it('v2 pasa a v4 sin tocar montos, id, meta ni plan',async()=>{
   const m:Movement={id:crypto.randomUUID(),type:'deposit',amountCOP:35000,localDate:'2026-11-01',createdAt:stamp,updatedAt:stamp};
   await new Promise<void>((resolve,reject)=>{
     const r=indexedDB.open('aiden-savings',2);
@@ -40,7 +40,7 @@ describe('migración y datos persistentes',()=>{
   await saveCountdown(countdown({targetDate:undefined,sourceEventId:e.id,pinned:true}),'add');
   await removeEvent(e.id);const data=await loadPersonalSnapshot();expect(data.events).toHaveLength(0);expect(data.countdowns).toMatchObject([{targetDate:e.startDate,pinned:true}]);expect(data.countdowns[0]).not.toHaveProperty('sourceEventId');expect(data.tasks).toHaveLength(1);
  });
- it('solo un countdown fijado y v3 restaura íntegramente',async()=>{
+ it('solo un countdown fijado y v4 restaura íntegramente',async()=>{
   const a=countdown({pinned:true}),b=countdown({pinned:true});await saveCountdown(a,'add');await saveCountdown(b,'add');
   expect((await loadPersonalSnapshot()).countdowns.filter(c=>c.pinned).map(c=>c.id)).toEqual([b.id]);
   await saveTask(task(),'add');const saved=await loadPersonalSnapshot();
