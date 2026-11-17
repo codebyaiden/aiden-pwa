@@ -25,24 +25,24 @@ export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onStat
   const [amount,setAmount]=useState(event?.amountCOP?.toString()??'');const [notes,setNotes]=useState(event?.notes??'');
   const [important,setImportant]=useState(event?.important??false);const [recurrence,setRecurrence]=useState<CalendarEvent['recurrence']>(event?.recurrence??'none');
   const [until,setUntil]=useState(event?.recurrenceUntil??'');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
-  const [editing,setEditing]=useState(!event);const [dirty,setDirty]=useState(false);
+  const [editing,setEditing]=useState(!event);const [dirty,setDirty]=useState(false);const gate=useRef(false);
   const change=()=>{setDirty(true);setError('');};
   const money=amount.trim()?parseMoneyInput(amount):undefined;
   const next:CalendarEvent={id:stableId.current,createdAt:createdAt.current,updatedAt:nowISO(),title:title.trim(),category,startDate:start,endDate:end,important,recurrence,
     ...(startTime?{startTime}:{}),...(endTime?{endTime}:{}),...(category!=='personal'&&money?{amountCOP:money}:{}),...(notes.trim()?{notes:notes.trim()}:{}),...(recurrence!=='none'&&until?{recurrenceUntil:until}:{})};
-  async function submit(e:FormEvent){e.preventDefault();if(busy)return;
+  async function submit(e:FormEvent){e.preventDefault();if(gate.current)return;
     if(category!=='personal'&&amount.trim()&&!money){setError('El importe debe ser COP entero positivo, máximo $999.999.999.');return;}
     if(!validEvent(next)){setError('Comprueba título, fechas, horas y recurrencia.');return;}
     const structural=event&&(event.startDate!==next.startDate||event.endDate!==next.endDate||event.recurrence!==next.recurrence||event.recurrenceUntil!==next.recurrenceUntil||event.category!==next.category);
     if(structural&&!window.confirm('Cambiar la serie eliminará las confirmaciones de pagos/ingresos de sus ocurrencias. ¿Continuar?'))return;
-    setBusy(true);setError('');try{await onSave(next,event?'edit':'add');}catch(err){setError(errorText(err));}finally{setBusy(false);}
+    gate.current=true;setBusy(true);setError('');try{await onSave(next,event?'edit':'add');}catch(err){setError(errorText(err));}finally{gate.current=false;setBusy(false);}
   }
-  async function remove(){if(!event||busy)return;
-    if(!window.confirm('¿Eliminar la serie completa? Se borrarán sus estados confirmados y los countdowns vinculados. No se puede deshacer.'))return;
-    setBusy(true);setError('');try{await onDelete(event);}catch(err){setError(errorText(err));}finally{setBusy(false);}
+  async function remove(){if(!event||gate.current)return;
+    if(!window.confirm('¿Eliminar la serie completa? Se borrarán sus pagos confirmados. Los countdowns vinculados conservarán su fecha como manual. No se puede deshacer.'))return;
+    gate.current=true;setBusy(true);setError('');try{await onDelete(event);}catch(err){setError(errorText(err));}finally{gate.current=false;setBusy(false);}
   }
-  async function mark(status:'paid'|'received'|'skipped'|null){if(!event||!occurrence||busy)return;
-    setBusy(true);setError('');try{await onState(status?{eventId:event.id,occurrenceStartDate:occurrence.startDate,occurrenceKey:occurrence.key,status,changedAt:nowISO()}:null,event.id,occurrence.startDate);}catch(err){setError(errorText(err));}finally{setBusy(false);}
+  async function mark(status:'paid'|'received'|'skipped'|null){if(!event||!occurrence||gate.current)return;
+    gate.current=true;setBusy(true);setError('');try{await onState(status?{eventId:event.id,occurrenceStartDate:occurrence.startDate,occurrenceKey:occurrence.key,status,changedAt:nowISO()}:null,event.id,occurrence.startDate);}catch(err){setError(errorText(err));}finally{gate.current=false;setBusy(false);}
   }
   return <Modal title={event?(editing?'Editar serie':'Evento'):'Añadir evento'} dirty={dirty&&editing} busy={busy} onClose={onClose} wide>
     {event&&!editing?<div className="form-stack">
@@ -69,17 +69,17 @@ export function EventDialog({event,occurrence,initialDate,onSave,onDelete,onStat
       <details><summary>Nota (opcional)</summary><textarea className="text-field" maxLength={500} rows={3} value={notes} onChange={e=>{setNotes(e.target.value);change();}}/></details>
       {error&&<p className="field-error" role="alert">{error}</p>}
       <button type="submit" className="button-primary" disabled={busy||!validEvent(next)||(category!=='personal'&&!!amount.trim()&&!money)}>{busy?'Guardando…':event?'Guardar serie':'Guardar evento'}</button>
-      {event&&<button type="button" className="text-action" onClick={()=>{setEditing(false);setDirty(false);}} disabled={busy}>Volver al detalle</button>}
+      {event&&<button type="button" className="text-action" onClick={()=>{if(!dirty||window.confirm('¿Descartar los cambios sin guardar?')){setEditing(false);setDirty(false);}}} disabled={busy}>Volver al detalle</button>}
     </form>}
   </Modal>;
 }
 export function TaskDialog({task,initialDate,onSave,onDelete,onClose}:{task?:Task;initialDate?:string;onSave:(t:Task,mode:'add'|'edit')=>Promise<void>;onDelete:(t:Task)=>Promise<void>;onClose:()=>void}){
   const id=useRef(task?.id??crypto.randomUUID()),created=useRef(task?.createdAt??nowISO());
   const [title,setTitle]=useState(task?.title??'');const [due,setDue]=useState(task?.dueDate??initialDate??'');
-  const [note,setNote]=useState(task?.note??'');const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [dirty,setDirty]=useState(false);
+  const [note,setNote]=useState(task?.note??'');const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [dirty,setDirty]=useState(false);const gate=useRef(false);
   const next:Task={id:id.current,title:title.trim(),createdAt:created.current,updatedAt:nowISO(),...(due?{dueDate:due}:{}),...(note.trim()?{note:note.trim()}:{}),...(task?.completedAt?{completedAt:task.completedAt}:{})};
-  async function submit(e:FormEvent){e.preventDefault();if(busy||!validTask(next))return;setBusy(true);setError('');try{await onSave(next,task?'edit':'add');}catch(e){setError(errorText(e));}finally{setBusy(false);}}
-  async function remove(){if(!task||busy||!window.confirm('¿Eliminar esta tarea?'))return;setBusy(true);try{await onDelete(task);}catch(e){setError(errorText(e));}finally{setBusy(false);}}
+  async function submit(e:FormEvent){e.preventDefault();if(gate.current||!validTask(next))return;gate.current=true;setBusy(true);setError('');try{await onSave(next,task?'edit':'add');}catch(e){setError(errorText(e));}finally{gate.current=false;setBusy(false);}}
+  async function remove(){if(!task||gate.current||!window.confirm('¿Eliminar esta tarea?'))return;gate.current=true;setBusy(true);try{await onDelete(task);}catch(e){setError(errorText(e));}finally{gate.current=false;setBusy(false);}}
   return <Modal title={task?'Editar tarea':'Añadir tarea'} dirty={dirty} busy={busy} onClose={onClose}><form className="form-stack" onSubmit={e=>void submit(e)}>
     <div className="field"><label htmlFor="task-title">Título</label><input className="text-field" id="task-title" required maxLength={100} value={title} onChange={e=>{setTitle(e.target.value);setDirty(true);}}/></div>
     <div className="field"><label htmlFor="task-date">Fecha (opcional)</label><input className="text-field" type="date" id="task-date" value={due} onChange={e=>{setDue(e.target.value);setDirty(true);}}/></div>
@@ -93,10 +93,10 @@ export function CountdownDialog({countdown,events,onSave,onDelete,onClose}:{coun
   const id=useRef(countdown?.id??crypto.randomUUID()),created=useRef(countdown?.createdAt??nowISO());
   const [title,setTitle]=useState(countdown?.title??'');const [date,setDate]=useState(countdown?.targetDate??bogotaToday());const [time,setTime]=useState(countdown?.targetTime??'');
   const [source,setSource]=useState(countdown?.sourceEventId??'');const [pinned,setPinned]=useState(countdown?.pinned??false);
-  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [dirty,setDirty]=useState(false);
+  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [dirty,setDirty]=useState(false);const gate=useRef(false);
   const next:Countdown={id:id.current,title:title.trim(),pinned,createdAt:created.current,updatedAt:nowISO(),...(source?{sourceEventId:source}:{targetDate:date,...(time?{targetTime:time}:{})})};
-  async function submit(e:FormEvent){e.preventDefault();if(!validCountdown(next)||busy)return;setBusy(true);setError('');try{await onSave(next,countdown?'edit':'add');}catch(e){setError(errorText(e));}finally{setBusy(false);}}
-  async function remove(){if(!countdown||busy||!window.confirm('¿Eliminar este countdown?'))return;setBusy(true);try{await onDelete(countdown);}catch(e){setError(errorText(e));}finally{setBusy(false);}}
+  async function submit(e:FormEvent){e.preventDefault();if(!validCountdown(next)||gate.current)return;gate.current=true;setBusy(true);setError('');try{await onSave(next,countdown?'edit':'add');}catch(e){setError(errorText(e));}finally{gate.current=false;setBusy(false);}}
+  async function remove(){if(!countdown||gate.current||!window.confirm('¿Eliminar este countdown?'))return;gate.current=true;setBusy(true);try{await onDelete(countdown);}catch(e){setError(errorText(e));}finally{gate.current=false;setBusy(false);}}
   return <Modal title={countdown?'Editar countdown':'Añadir countdown'} dirty={dirty} busy={busy} onClose={onClose}><form className="form-stack" onSubmit={e=>void submit(e)}>
     <div className="field"><label htmlFor="count-title">Título</label><input className="text-field" id="count-title" maxLength={100} required value={title} onChange={e=>{setTitle(e.target.value);setDirty(true);}}/></div>
     {events.some(e=>e.category==='personal')&&<div className="field"><label htmlFor="count-source">Vincular a un evento (opcional)</label><select className="text-field" id="count-source" value={source} onChange={e=>{setSource(e.target.value);setDirty(true);}}><option value="">Fecha manual</option>{events.filter(e=>e.category==='personal').map(e=><option key={e.id} value={e.id}>{e.title} · {e.startDate}</option>)}</select></div>}
