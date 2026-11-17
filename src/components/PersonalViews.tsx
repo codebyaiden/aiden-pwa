@@ -112,18 +112,22 @@ export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpen
   return <div className="view-panel home-view">
     <button className="home-savings-hit" type="button" onClick={onSavings} aria-label="Abrir ahorros"><div className="home-savings-top"><span>En mi alcancía</span><span className="home-savings-arrow">↗</span></div><div className="home-balance"><AnimatedMoney value={balance(data.movements)} /></div><div className="home-savings-stats"><span>Aportado este mes <strong>{formatCOP(monthTotals(data.movements,today.slice(0,7)).deposited)}</strong></span><span>Julio de 2029 <strong>{projection(data.movements,data.settings,today)===null?'Sin plan':formatCOP(projection(data.movements,data.settings,today)!)}</strong></span></div></button>
     <StreakIndicator movements={data.movements} today={today} celebrate={streakCelebrate} compact />
-    {pinned&&target&&<section className="home-countdown"><div className="section-title-row"><h2>Countdown fijado</h2><button className="text-action" onClick={()=>onCountdown(pinned)}>Editar</button></div><p className="countdown-name">{pinned.title}</p><p className="countdown-time" aria-live="off"><CountdownDigits value={countdownText(target.date,target.time,today,now)}/></p><p className="field-hint">{localDateLabel(target.date,{day:'numeric',month:'long',year:'numeric'})}{target.time?` · ${target.time}`:''}</p></section>}
-    <section className="home-agenda"><div className="section-title-row"><h2>Próximos</h2><button className="text-action" onClick={onCalendar}>Ver calendario</button></div>
+    {pinned&&target&&<section className="home-countdown"><div className="countdown-heading"><span className="eyebrow">Cuenta regresiva</span><button type="button" className="text-action" onClick={()=>onCountdown(pinned)}>Editar</button></div><h2 className="countdown-name">{pinned.title}</h2><CountdownDisplay value={countdownText(target.date,target.time,today,now)}/><p className="countdown-date">{localDateLabel(target.date,{day:'numeric',month:'long',year:'numeric'})}{target.time?` · ${target.time}`:''}</p></section>}
+    <section className={`home-agenda ${visible.length===0?'home-empty':''}`}>{visible.length>0&&<div className="section-title-row"><h2>Próximos</h2><button className="text-action" onClick={onCalendar}>Ver calendario</button></div>}
       {visible.length===0?<div className="empty-inline"><p>Sin planes próximos.</p><button className="text-action" onClick={onAddEvent}>Añadir evento</button></div>:visible.map(o=><div key={o.key} className="home-upcoming"><span className="home-upcoming-date">{o.event.category==='expense'&&o.startDate<today?'Vencido':o.event.category==='expense'&&o.startDate===today?'Pagar hoy':o.event.category==='expense'&&dayDifference(today,o.startDate)===1?'Mañana':o.event.category==='expense'&&dayDifference(today,o.startDate)===3?'En 3 días':localDateLabel(o.startDate,{day:'numeric',month:'short'})}</span><button className="home-upcoming-info" onClick={()=>onOpenEvent(o)}><strong>{o.event.title}</strong><small>{categoryName(o.event.category)}{o.event.amountCOP?` · ${formatCOP(o.event.amountCOP)}`:''}{o.event.category==='income'?' · Por recibir':''}</small></button></div>)}
     </section>
-    <section className="home-tasks"><div className="section-title-row"><h2>Tareas</h2><button className="text-action" onClick={onTasks}>Ver todas</button></div>
-      {tasks.length===0?<p className="empty-state">Todo al día.</p>:tasks.map(t=><div className="task-row" key={t.id}><label className="task-checkbox"><input aria-label={`Completar ${t.title}`} type="checkbox" checked={false} onChange={()=>onTaskToggle(t)}/></label><button className="task-row-body" onClick={()=>onOpenTask(t)}><strong>{t.title}</strong>{t.dueDate&&<small>{localDateLabel(t.dueDate,{day:'numeric',month:'short'})}</small>}</button></div>)}
+    <section className={`home-tasks ${tasks.length===0?'home-empty':''}`}>{tasks.length>0&&<div className="section-title-row"><h2>Tareas</h2><button className="text-action" onClick={onTasks}>Ver todas</button></div>}
+      {tasks.length===0?<div className="empty-inline"><p>Todo al día.</p><button className="text-action" onClick={onTasks}>Ver tareas</button></div>:tasks.map(t=><div className="task-row" key={t.id}><label className="task-checkbox"><input aria-label={`Completar ${t.title}`} type="checkbox" checked={false} onChange={()=>onTaskToggle(t)}/></label><button className="task-row-body" onClick={()=>onOpenTask(t)}><strong>{t.title}</strong>{t.dueDate&&<small>{localDateLabel(t.dueDate,{day:'numeric',month:'short'})}</small>}</button></div>)}
     </section>
     {data.countdowns.length>0&&!pinned&&<button type="button" className="quiet-link" onClick={()=>onCountdown(data.countdowns[0])}>Gestionar countdowns</button>}
     {data.countdowns.length===0&&<button type="button" className="quiet-link" onClick={onAddCountdown}>Crear countdown</button>}
   </div>;
 }
-function CountdownDigits({value}:{value:string}){
-  return <>{value.split(/(\d+)/).map((piece,index)=>/^\d+$/.test(piece)?<span className="countdown-digits" key={`${index}-${piece}`}>{piece}</span>:<span key={index}>{piece}</span>)}</>;
+function CountdownDisplay({value}:{value:string}){
+  const parts=/^(\d+)d (\d+)h (\d+)m (\d+)s$/.exec(value);
+  if(!parts)return <p className="countdown-day-value" aria-live="off">{value}</p>;
+  return <div className="countdown-clock" role="timer" aria-label={value} aria-live="off">
+    {(['días','horas','min','seg'] as const).map((unit,index)=><span className="clock-unit" key={unit}><span className="clock-number"><span className="countdown-digits" key={parts[index+1]}>{parts[index+1]}</span></span><span className="clock-label">{unit}</span></span>)}
+  </div>;
 }
 export type {Filter};
