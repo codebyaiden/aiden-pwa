@@ -1,5 +1,5 @@
 import type { Snapshot } from '../savings/types';
-import { balance, formatCOP, monthTotals, projection } from '../savings/calculations';
+import { balance, monthTotals, projection } from '../savings/calculations';
 import { AnimatedMoney } from './Shared';
 
 export function SavingsHero({ data, today, onConfigure }: { data: Snapshot; today: string; onConfigure: () => void }) {
