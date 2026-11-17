@@ -38,7 +38,7 @@ describe('migración y datos persistentes',()=>{
  it('borrar un evento conserva countdown vinculado como fecha manual y no afecta tareas',async()=>{
   const e=event({category:'personal'});await saveEvent(e,'add');await saveTask(task(),'add');
   await saveCountdown(countdown({targetDate:undefined,sourceEventId:e.id,pinned:true}),'add');
-  await removeEvent(e.id);const data=await loadPersonalSnapshot();expect(data.events).toHaveLength(0);expect(data.countdowns).toMatchObject([{sourceEventId:undefined,targetDate:e.startDate,pinned:true}]);expect(data.tasks).toHaveLength(1);
+  await removeEvent(e.id);const data=await loadPersonalSnapshot();expect(data.events).toHaveLength(0);expect(data.countdowns).toMatchObject([{targetDate:e.startDate,pinned:true}]);expect(data.countdowns[0]).not.toHaveProperty('sourceEventId');expect(data.tasks).toHaveLength(1);
  });
  it('solo un countdown fijado y v3 restaura íntegramente',async()=>{
   const a=countdown({pinned:true}),b=countdown({pinned:true});await saveCountdown(a,'add');await saveCountdown(b,'add');
@@ -84,7 +84,7 @@ describe('integridad de operaciones v1.2',()=>{
   const e=event({category:'personal',startDate:'2027-05-12',endDate:'2027-05-13'});
   await saveEvent(e,'add');const c=countdown({targetDate:undefined,sourceEventId:e.id,pinned:true});
   await saveCountdown(c,'add');await saveEvent({...e,category:'expense'},'edit');
-  const data=await loadPersonalSnapshot();expect(data.countdowns).toMatchObject([{id:c.id,pinned:true,targetDate:'2027-05-12',sourceEventId:undefined}]);
+  const data=await loadPersonalSnapshot();expect(data.countdowns).toMatchObject([{id:c.id,pinned:true,targetDate:'2027-05-12'}]);expect(data.countdowns[0]).not.toHaveProperty('sourceEventId');
  });
  it('duplicar explícitamente el mismo id no introduce dos eventos ni modifica el original',async()=>{
   const e=event();await saveEvent(e,'add');await saveEvent(e,'add');
