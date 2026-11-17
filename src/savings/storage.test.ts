@@ -92,7 +92,7 @@ describe('v1.1 IndexedDB upgrade and data integrity', () => {
     expect(balance(result.movements)).toBe(30000);
     expect(result.settings).toEqual({ schemaVersion: 2, monthlyPlanCOP: 150000, finalGoalCOP: null, targetEndMonth: '2029-07' });
     const onDisk = await new Promise<unknown>((resolve, reject) => {
-      const opening = indexedDB.open('aiden-savings', 2);
+      const opening = indexedDB.open('aiden-savings', 3);
       opening.onsuccess = () => {
         const db = opening.result;
         const req = db.transaction('settings').objectStore('settings').get('current');

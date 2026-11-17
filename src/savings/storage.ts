@@ -4,10 +4,10 @@ import type { Movement, Settings, Snapshot } from './types';
 import { migrateSettings, validateLedger, validateSettings, validateSettingsV1 } from './validation';
 
 const DB_NAME = 'aiden-savings';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SETTING_KEY = 'current';
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
+export function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error('Error al acceder al almacenamiento.'));
@@ -26,6 +26,10 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains('movements')) db.createObjectStore('movements', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      if (!db.objectStoreNames.contains('events')) db.createObjectStore('events', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('eventOccurrenceStates')) db.createObjectStore('eventOccurrenceStates', { keyPath: 'occurrenceKey' });
+      if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('countdowns')) db.createObjectStore('countdowns', { keyPath: 'id' });
       // Schema v2 adds an independent final goal. Keep every movement and the existing plan.
       if (req.transaction && req.transaction.objectStoreNames.contains('settings')) {
         const settingsStore = req.transaction.objectStore('settings');
@@ -51,7 +55,7 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-async function transaction<T>(mode: IDBTransactionMode, stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
+export async function transaction<T>(mode: IDBTransactionMode, stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
   const db = await openDatabase();
   try {
     const tx = db.transaction(stores, mode);
