@@ -1,4 +1,4 @@
-import { useEffect,useMemo,useState } from 'react';
+import { useEffect,useMemo,useRef,useState } from 'react';
 import { balance,formatCOP,monthTotals,projection,formatMonth } from '../savings/calculations';
 import { addDays, countdownText, dayDifference, financialReminders, localDateLabel, monthCells, occurrencesForRange, occurrencesOnDay, resolveCountdown } from '../personal/dates';
 import type { CalendarEvent,Countdown,EventOccurrenceState,Occurrence,PersonalSnapshot,Task } from '../personal/types';
@@ -23,6 +23,9 @@ export function CalendarView({data,today,month,onMonth,selected,onSelect,filter,
  data:PersonalSnapshot;today:string;month:string;onMonth:(m:string)=>void;selected:string;onSelect:(d:string)=>void;filter:Filter;onFilter:(f:Filter)=>void;
  onOpenEvent:(o:Occurrence)=>void;onOpenTask:(t:Task)=>void;onAddEvent:(date:string)=>void;onTaskToggle:(t:Task)=>void;onOpenCountdown:(c:Countdown)=>void;onAddCountdown:()=>void;
 }){
+  const previousMonth=useRef(month);
+  const direction=month<previousMonth.current?'previous':'next';
+  useEffect(()=>{previousMonth.current=month;},[month]);
   const cells=useMemo(()=>monthCells(month),[month]);
   const from=cells[0],to=cells[cells.length-1];
   const visibleEvents=useMemo(()=>data.events.filter(e=>filter==='all'||filter==='important'&&e.important||e.category===filter),[data.events,filter]);
@@ -46,7 +49,7 @@ export function CalendarView({data,today,month,onMonth,selected,onSelect,filter,
         <button type="button" className="icon-button" aria-label="Mes siguiente" onClick={()=>changeMonth(1)}><Icon name="right"/></button>
       </div>
       <div className="calendar-weekdays" aria-hidden="true">{['lun','mar','mié','jue','vie','sáb','dom'].map(x=><span key={x}>{x}</span>)}</div>
-      <div className="calendar-grid" key={month} role="group" aria-label={formatMonth(month)}>
+      <div className={`calendar-grid ${direction}`} key={month} role="group" aria-label={formatMonth(month)}>
         {cells.map((day,i)=>{
           const todays=occurrences.filter(o=>o.startDate<=day&&o.endDate>=day);
           const dayTasks=tasks.filter(t=>t.dueDate===day);
@@ -94,9 +97,11 @@ export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpen
   const [now,setNow]=useState(()=>new Date());const pinned=data.countdowns.find(c=>c.pinned);
   const target=pinned?resolveCountdown(pinned,data.events):null;
   useEffect(()=>{if(!target?.time)return;
-    const tick=()=>{if(document.visibilityState==='visible')setNow(new Date());};
-    const id=setInterval(tick,1000);document.addEventListener('visibilitychange',tick);
-    return ()=>{clearInterval(id);document.removeEventListener('visibilitychange',tick);};
+    let id:ReturnType<typeof setInterval>|null=null;
+    const visibility=()=>{if(id!==null){clearInterval(id);id=null;}
+      if(document.visibilityState==='visible'){setNow(new Date());id=setInterval(()=>setNow(new Date()),1000);} };
+    visibility();document.addEventListener('visibilitychange',visibility);
+    return ()=>{if(id!==null)clearInterval(id);document.removeEventListener('visibilitychange',visibility);};
   },[target?.date,target?.time]);
   const end=addDays(today,6);
   const events=occurrencesForRange(data.events,today,end).filter(o=>!data.eventOccurrenceStates.some(s=>s.occurrenceKey===o.key))
@@ -107,9 +112,9 @@ export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpen
   return <div className="view-panel home-view">
     <button className="home-savings-hit" type="button" onClick={onSavings} aria-label="Abrir ahorros"><div className="home-savings-top"><span>En mi alcancía</span><span className="home-savings-arrow">↗</span></div><div className="home-balance"><AnimatedMoney value={balance(data.movements)} /></div><div className="home-savings-stats"><span>Aportado este mes <strong>{formatCOP(monthTotals(data.movements,today.slice(0,7)).deposited)}</strong></span><span>Julio de 2029 <strong>{projection(data.movements,data.settings,today)===null?'Sin plan':formatCOP(projection(data.movements,data.settings,today)!)}</strong></span></div></button>
     <StreakIndicator movements={data.movements} today={today} celebrate={streakCelebrate} compact />
-    {pinned&&target&&<section className="home-countdown"><div className="section-title-row"><h2>Countdown fijado</h2><button className="text-action" onClick={()=>onCountdown(pinned)}>Editar</button></div><p className="countdown-name">{pinned.title}</p><p className="countdown-time" aria-live="off">{countdownText(target.date,target.time,today,now)}</p><p className="field-hint">{localDateLabel(target.date,{day:'numeric',month:'long',year:'numeric'})}{target.time?` · ${target.time}`:''}</p></section>}
+    {pinned&&target&&<section className="home-countdown"><div className="section-title-row"><h2>Countdown fijado</h2><button className="text-action" onClick={()=>onCountdown(pinned)}>Editar</button></div><p className="countdown-name">{pinned.title}</p><p className="countdown-time" aria-live="off"><CountdownDigits value={countdownText(target.date,target.time,today,now)}/></p><p className="field-hint">{localDateLabel(target.date,{day:'numeric',month:'long',year:'numeric'})}{target.time?` · ${target.time}`:''}</p></section>}
     <section className="home-agenda"><div className="section-title-row"><h2>Próximos</h2><button className="text-action" onClick={onCalendar}>Ver calendario</button></div>
-      {visible.length===0?<div className="empty-inline"><p>Sin planes próximos.</p><button className="text-action" onClick={onAddEvent}>Añadir evento</button></div>:visible.map(o=><div key={o.key} className="home-upcoming"><span className="home-upcoming-date">{o.startDate<today?'Vencido':localDateLabel(o.startDate,{day:'numeric',month:'short'})}</span><button className="home-upcoming-info" onClick={()=>onOpenEvent(o)}><strong>{o.event.title}</strong><small>{categoryName(o.event.category)}{o.event.amountCOP?` · ${formatCOP(o.event.amountCOP)}`:''}{o.startDate>today&&o.event.category==='expense'&&[1,3].includes(dayDifference(today,o.startDate))?` · ${dayDifference(today,o.startDate)===1?'Mañana':'En 3 días'}`:''}</small></button></div>)}
+      {visible.length===0?<div className="empty-inline"><p>Sin planes próximos.</p><button className="text-action" onClick={onAddEvent}>Añadir evento</button></div>:visible.map(o=><div key={o.key} className="home-upcoming"><span className="home-upcoming-date">{o.event.category==='expense'&&o.startDate<today?'Vencido':o.event.category==='expense'&&o.startDate===today?'Pagar hoy':o.event.category==='expense'&&dayDifference(today,o.startDate)===1?'Mañana':o.event.category==='expense'&&dayDifference(today,o.startDate)===3?'En 3 días':localDateLabel(o.startDate,{day:'numeric',month:'short'})}</span><button className="home-upcoming-info" onClick={()=>onOpenEvent(o)}><strong>{o.event.title}</strong><small>{categoryName(o.event.category)}{o.event.amountCOP?` · ${formatCOP(o.event.amountCOP)}`:''}{o.event.category==='income'?' · Por recibir':''}</small></button></div>)}
     </section>
     <section className="home-tasks"><div className="section-title-row"><h2>Tareas</h2><button className="text-action" onClick={onTasks}>Ver todas</button></div>
       {tasks.length===0?<p className="empty-state">Todo al día.</p>:tasks.map(t=><div className="task-row" key={t.id}><label className="task-checkbox"><input aria-label={`Completar ${t.title}`} type="checkbox" checked={false} onChange={()=>onTaskToggle(t)}/></label><button className="task-row-body" onClick={()=>onOpenTask(t)}><strong>{t.title}</strong>{t.dueDate&&<small>{localDateLabel(t.dueDate,{day:'numeric',month:'short'})}</small>}</button></div>)}
@@ -117,5 +122,8 @@ export function HomeView({data,today,streakCelebrate,onSavings,onAddEvent,onOpen
     {data.countdowns.length>0&&!pinned&&<button type="button" className="quiet-link" onClick={()=>onCountdown(data.countdowns[0])}>Gestionar countdowns</button>}
     {data.countdowns.length===0&&<button type="button" className="quiet-link" onClick={onAddCountdown}>Crear countdown</button>}
   </div>;
+}
+function CountdownDigits({value}:{value:string}){
+  return <>{value.split(/(\d+)/).map((piece,index)=>/^\d+$/.test(piece)?<span className="countdown-digits" key={`${index}-${piece}`}>{piece}</span>:<span key={index}>{piece}</span>)}</>;
 }
 export type {Filter};
