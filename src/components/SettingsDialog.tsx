@@ -1,11 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import type { BackupV1, Snapshot } from '../savings/types';
+import type { BackupV2, Snapshot } from '../savings/types';
 import { backupSummary, createBackup, downloadBackup, MAX_BACKUP_SIZE, parseBackup } from '../savings/backup';
 import { formatCOP } from '../savings/calculations';
 import { Modal, Icon } from './Shared';
 
-export function SettingsDialog({ data, onClose, onRestore }: { data: Snapshot; onClose: () => void; onRestore: (backup: BackupV1) => Promise<void> }) {
-  const [backup, setBackup] = useState<BackupV1 | null>(null);
+export function SettingsDialog({ data, onClose, onRestore }: { data: Snapshot; onClose: () => void; onRestore: (backup: BackupV2) => Promise<void> }) {
+  const [backup, setBackup] = useState<BackupV2 | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,12 +50,12 @@ export function SettingsDialog({ data, onClose, onRestore }: { data: Snapshot; o
     <div className="section-divider" />
     <div className="backup-section">
       <h3>Restaurar desde un archivo</h3>
-      <p>Importar reemplaza todos los movimientos y el plan actual. Exporta una copia antes de continuar.</p>
+      <p>Importar reemplaza los movimientos, el plan mensual y la meta final. Exporta una copia antes de continuar.</p>
       <input ref={fileInput} className="sr-only" id="backup-file" type="file" accept=".json,application/json" onChange={(e) => { void chooseFile(e); }} />
       <button className="button-secondary" type="button" disabled={busy} onClick={() => fileInput.current?.click()}><Icon name="upload" /> Importar copia</button>
       {backup && info && <div className="backup-preview" aria-label="Resumen de la copia">
         <p><strong>Archivo validado</strong></p>
-        <dl><div><dt>Movimientos</dt><dd>{info.count}</dd></div><div><dt>Saldo</dt><dd>{formatCOP(info.total)}</dd></div><div><dt>Plan mensual</dt><dd>{backup.settings.monthlyPlanCOP === null ? 'Sin configurar' : formatCOP(backup.settings.monthlyPlanCOP)}</dd></div></dl>
+        <dl><div><dt>Movimientos</dt><dd>{info.count}</dd></div><div><dt>Saldo</dt><dd>{formatCOP(info.total)}</dd></div><div><dt>Plan mensual</dt><dd>{backup.settings.monthlyPlanCOP === null ? 'Sin configurar' : formatCOP(backup.settings.monthlyPlanCOP)}</dd></div><div><dt>Meta final</dt><dd>{backup.settings.finalGoalCOP === null ? 'Sin configurar' : formatCOP(backup.settings.finalGoalCOP)}</dd></div></dl>
         <p className="backup-warning">Se reemplazarán todos tus datos actuales. Esta acción no se puede deshacer sin otra copia.</p>
         <button type="button" className="button-danger" disabled={busy} onClick={() => { void restore(); }}>{busy ? 'Importando…' : 'Reemplazar mis datos'}</button>
         <button type="button" className="text-action" disabled={busy} onClick={() => { setBackup(null); if (fileInput.current) fileInput.current.value = ''; }}>Cancelar importación</button>

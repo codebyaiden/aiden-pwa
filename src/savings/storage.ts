@@ -1,10 +1,10 @@
 import { bogotaToday } from './calculations';
 import { DEFAULT_SETTINGS } from './types';
 import type { Movement, Settings, Snapshot } from './types';
-import { validateLedger, validateSettings } from './validation';
+import { migrateSettings, validateLedger, validateSettings, validateSettingsV1 } from './validation';
 
 const DB_NAME = 'aiden-savings';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SETTING_KEY = 'current';
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
@@ -26,6 +26,17 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains('movements')) db.createObjectStore('movements', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      // Schema v2 adds an independent final goal. Keep every movement and the existing plan.
+      if (req.transaction && req.transaction.objectStoreNames.contains('settings')) {
+        const settingsStore = req.transaction.objectStore('settings');
+        const existing = settingsStore.get(SETTING_KEY);
+        existing.onsuccess = () => {
+          if (validateSettingsV1(existing.result)) {
+            settingsStore.put(migrateSettings(existing.result), SETTING_KEY);
+          }
+          // Unknown records remain untouched and will produce a recoverable load error.
+        };
+      }
     };
     req.onerror = () => fail(req.error ?? new Error('No se pudo abrir la base de datos.'));
     req.onblocked = () => fail(new Error('Otra pestaña está impidiendo abrir la base de datos. Ciérrala e inténtalo de nuevo.'));
@@ -65,8 +76,7 @@ async function transaction<T>(mode: IDBTransactionMode, stores: string[], work: 
 
 function checkedSettings(raw: unknown): Settings {
   if (raw === undefined) return { ...DEFAULT_SETTINGS };
-  if (!validateSettings(raw)) throw new Error('La configuración guardada no es válida. No se ha modificado ningún dato.');
-  return raw;
+  return migrateSettings(raw);
 }
 
 export async function loadSnapshot(): Promise<Snapshot> {
@@ -113,14 +123,23 @@ export async function removeMovement(id: string): Promise<void> {
   });
 }
 
-export async function saveMonthlyPlan(monthlyPlanCOP: number | null): Promise<void> {
-  const settings: Settings = { ...DEFAULT_SETTINGS, monthlyPlanCOP };
-  if (!validateSettings(settings)) throw new Error('El plan mensual no es válido.');
+/** Update one setting without overwriting the other. Writes commit before resolving. */
+async function updateSettings(patch: Pick<Settings, 'monthlyPlanCOP'> | Pick<Settings, 'finalGoalCOP'>): Promise<void> {
   await transaction('readwrite', ['settings'], async (tx) => {
     const store = tx.objectStore('settings');
-    checkedSettings(await request<Settings | undefined>(store.get(SETTING_KEY)));
-    store.put(settings, SETTING_KEY);
+    const current = checkedSettings(await request<Settings | undefined>(store.get(SETTING_KEY)));
+    const next: Settings = { ...current, ...patch };
+    if (!validateSettings(next)) throw new Error('La configuración no es válida.');
+    store.put(next, SETTING_KEY);
   });
+}
+
+export async function saveMonthlyPlan(monthlyPlanCOP: number | null): Promise<void> {
+  return updateSettings({ monthlyPlanCOP });
+}
+
+export async function saveFinalGoal(finalGoalCOP: number | null): Promise<void> {
+  return updateSettings({ finalGoalCOP });
 }
 
 export async function restoreSnapshot(snapshot: Snapshot): Promise<void> {

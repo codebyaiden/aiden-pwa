@@ -3,10 +3,11 @@ import type { Movement, Snapshot } from '../savings/types';
 import { balance, formatCOP, formatMonth, monthTotals, monthlyProgress, projection, sortNewest } from '../savings/calculations';
 import { MovementList } from './MovementList';
 import { AnimatedMoney, Icon } from './Shared';
+import { FinalGoal, MonthlyChart, SavingsSimulator, StreakIndicator } from './SavingsInsights';
 
-export function SavingsDetail({ data, today, onBack, onAdd, onWithdraw, onSelect, onPlan, newlySavedId }: {
+export function SavingsDetail({ data, today, onBack, onAdd, onWithdraw, onSelect, onPlan, onGoal, newlySavedId, streakCelebrate }: {
   data: Snapshot; today: string; onBack: () => void; onAdd: () => void; onWithdraw: () => void;
-  onSelect: (m: Movement) => void; onPlan: () => void; newlySavedId: string | null;
+  onSelect: (m: Movement) => void; onPlan: () => void; onGoal: () => void; newlySavedId: string | null; streakCelebrate: boolean;
 }) {
   const current = today.slice(0, 7);
   const [selected, setSelected] = useState(current);
@@ -28,6 +29,13 @@ export function SavingsDetail({ data, today, onBack, onAdd, onWithdraw, onSelect
       <div className="detail-stats"><div><span>Aportado</span><strong>{formatCOP(total.deposited)}</strong></div><div><span>Retirado</span><strong>{formatCOP(total.withdrawn)}</strong></div>{total.withdrawn > 0 && <div><span>Cambio neto</span><strong>{total.net < 0 ? '−' : total.net > 0 ? '+' : ''}{formatCOP(Math.abs(total.net))}</strong></div>}</div>
       <div key={selected} className="month-results"><MovementList movements={sortNewest(data.movements.filter((m) => m.localDate.startsWith(selected)))} onSelect={onSelect} today={today} newlySavedId={newlySavedId} /></div>
     </section>
+    <section className="section-detail insights-section">
+      <div className="section-title-row"><h2>Últimos seis meses</h2></div>
+      <MonthlyChart movements={data.movements} today={today} />
+      <StreakIndicator movements={data.movements} today={today} celebrate={streakCelebrate} />
+    </section>
+    <FinalGoal data={data} today={today} onEdit={onGoal} />
+    <SavingsSimulator data={data} today={today} />
     <section className="section-detail plan-detail">
       <div className="section-title-row"><h2>Plan mensual</h2><button className="text-action" type="button" onClick={onPlan}>Editar plan</button></div>
       {data.settings.monthlyPlanCOP === null ? <button type="button" className="quiet-link" onClick={onPlan}>Configura tu aporte mensual</button> : <>
