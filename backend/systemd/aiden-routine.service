@@ -1,0 +1,27 @@
+[Unit]
+Description=aiden. Routine API and reminder scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=aiden-routine
+StateDirectoryMode=0700
+WorkingDirectory=/opt/aiden-routine
+Environment=DATABASE=/var/lib/aiden-routine/routine.sqlite
+EnvironmentFile=/etc/aiden-routine/service.env
+ExecStart=/usr/bin/node /opt/aiden-routine/server.mjs
+Restart=always
+RestartSec=3s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

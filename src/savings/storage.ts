@@ -4,7 +4,7 @@ import type { Movement, Settings, Snapshot } from './types';
 import { migrateSettings, validateLedger, validateSettings, validateSettingsV1 } from './validation';
 
 const DB_NAME = 'aiden-savings';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const SETTING_KEY = 'current';
 
 export function request<T>(req: IDBRequest<T>): Promise<T> {
@@ -30,6 +30,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('eventOccurrenceStates')) db.createObjectStore('eventOccurrenceStates', { keyPath: 'occurrenceKey' });
       if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('countdowns')) db.createObjectStore('countdowns', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('routine')) db.createObjectStore('routine');
       if (!db.objectStoreNames.contains('financeEntries')) {
         const fs = db.createObjectStore('financeEntries', { keyPath: 'id' });
         fs.createIndex('byOccurrence', 'occurrenceKey', { unique: true });

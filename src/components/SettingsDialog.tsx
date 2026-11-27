@@ -1,7 +1,9 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import {loadRoutine} from '../routine/storage';
+import type {State} from '../routine/engine';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { PersonalSnapshot } from '../personal/types';
 import type { ParsedBackup } from '../personal/backup';
-import { createPersonalBackup, downloadPersonalBackup, parsePersonalBackup, personalBackupSummary } from '../personal/backup';
+import { createUnifiedBackup, downloadPersonalBackup, parsePersonalBackup, personalBackupSummary } from '../personal/backup';
 import { MAX_BACKUP_SIZE } from '../savings/backup';
 import { formatCOP } from '../savings/calculations';
 import { Modal, Icon } from './Shared';
@@ -13,14 +15,24 @@ export function SettingsDialog({ data, onClose, onRestore }: { data: PersonalSna
   const [busy, setBusy] = useState(false);
   const gate = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [routine,setRoutine]=useState<State|null>(null);
+  useEffect(()=>{
+    let active=true;
+    const refresh=()=>{void loadRoutine().then(state=>{if(active)setRoutine(state);}).catch(()=>{
+      if(active)setError('No se pudo leer la rutina para exportarla.');
+    });};
+    refresh();
+    window.addEventListener('aiden:routine-synced',refresh);
+    return()=>{active=false;window.removeEventListener('aiden:routine-synced',refresh);};
+  },[]);
   function exportNow() {
     setError(''); setNotice('');
-    try { downloadPersonalBackup(createPersonalBackup(data)); setNotice('Descarga solicitada. Comprueba que el archivo quedó guardado.'); }
+    try { downloadPersonalBackup(createUnifiedBackup(data,routine!)); setNotice('Descarga solicitada. Comprueba que el archivo quedó guardado.'); }
     catch { setError('No se pudo preparar la copia. Inténtalo de nuevo.'); }
   }
   async function shareNow() {
     setError('');
-    const snapshot = createPersonalBackup(data);
+    const snapshot = createUnifiedBackup(data,routine!);
     const file = new File([JSON.stringify(snapshot, null, 2)], `aiden-personal.json`, { type: 'application/json' });
     if (!navigator.canShare?.({ files: [file] }) || !navigator.share) { setError('Tu navegador no permite compartir archivos. Usa Exportar copia.'); return; }
     try { await navigator.share({ files: [file], title: 'Copia de aiden.' }); }
@@ -46,26 +58,26 @@ export function SettingsDialog({ data, onClose, onRestore }: { data: PersonalSna
     <div className="backup-section">
       <h3>Guardar una copia</h3>
       <p>Tus ahorros, gastos reales, eventos, tareas y countdowns se guardan localmente. GitHub Pages no los respalda.</p>
-      <button className="button-secondary" type="button" onClick={exportNow} disabled={busy}><Icon name="download" /> Exportar copia</button>
-      <button className="text-action" type="button" onClick={() => { void shareNow(); }} disabled={busy}>Compartir archivo…</button>
+      <button className="button-secondary" type="button" onClick={exportNow} disabled={busy||!routine}><Icon name="download" /> Exportar copia</button>
+      <button className="text-action" type="button" onClick={() => { void shareNow(); }} disabled={busy||!routine}>Compartir archivo…</button>
     </div>
     <div className="section-divider" />
     <div className="backup-section">
       <h3>Restaurar desde un archivo</h3>
-      <p>Una copia v4 reemplaza todos los datos. Una v3 restaura la agenda y ahorros, pero conserva los gastos reales (desvinculando sus vencimientos). Una copia antigua v1/v2 reemplaza solo los ahorros y conserva la agenda, tareas y countdowns.</p>
+      <p>Las copias v5 incluyen Rutina. Los formatos anteriores conservan la rutina actual. Una v3 conserva los gastos reales y desvincula sus vencimientos. Las copias v1/v2 restauran los ahorros.</p>
       <input ref={fileInput} className="sr-only" id="backup-file" type="file" accept=".json,application/json" onChange={(e) => { void chooseFile(e); }} />
       <button className="button-secondary" type="button" disabled={busy} onClick={() => fileInput.current?.click()}><Icon name="upload" /> Importar copia</button>
       {backup && info && <div className="backup-preview" aria-label="Resumen de la copia">
         <p><strong>{backup.kind === 'full' ? 'Copia integral validada' : 'Copia de ahorros v1/v2 validada'}</strong></p>
         <dl><div><dt>Movimientos</dt><dd>{info.movements}</dd></div><div><dt>Saldo</dt><dd>{formatCOP(info.total)}</dd></div><div><dt>Plan mensual</dt><dd>{(backup.kind === 'full' ? backup.data : backup.savings).settings.monthlyPlanCOP === null ? 'Sin configurar' : formatCOP((backup.kind === 'full' ? backup.data : backup.savings).settings.monthlyPlanCOP!)}</dd></div><div><dt>Meta final</dt><dd>{(backup.kind === 'full' ? backup.data : backup.savings).settings.finalGoalCOP === null ? 'Sin configurar' : formatCOP((backup.kind === 'full' ? backup.data : backup.savings).settings.finalGoalCOP!)}</dd></div></dl>
         {backup.kind==='full' && <p className="field-hint">{info.events} eventos · {info.tasks} tareas · {info.countdowns} countdowns</p>}
-        <p className="backup-warning">{backup.kind === 'full' ? 'Se reemplazarán todos los datos actuales. Exporta una copia antes de continuar.' : 'Solo se reemplazarán los ahorros. Calendario, tareas y countdowns permanecerán intactos.'}</p>
+        <p className="backup-warning">{backup.kind === 'full' ? backup.routine?'Se reemplazarán tus datos actuales, incluida la rutina.':'Se restaurarán los datos incluidos en la copia.' : 'Solo se reemplazarán los ahorros. Calendario, tareas y countdowns permanecerán intactos.'}</p>
         <button type="button" className="button-danger" disabled={busy} onClick={() => { void restore(); }}>{busy ? 'Importando…' : 'Reemplazar mis datos'}</button>
         <button type="button" className="text-action" disabled={busy} onClick={() => { setBackup(null); if (fileInput.current) fileInput.current.value = ''; }}>Cancelar importación</button>
       </div>}
     </div>
     {error && <p className="field-error" role="alert">{error}</p>}
     {notice && <p className="field-hint" role="status">{notice}</p>}
-    <p className="local-warning">Si cambias de teléfono, navegador o dirección web, necesitarás exportar e importar una copia. No existe sincronización automática.</p>
+    <p className="local-warning">Si cambias de teléfono, navegador o dirección web, necesitarás exportar e importar una copia. Solo Rutina tiene sincronización opcional.</p>
   </Modal>;
 }

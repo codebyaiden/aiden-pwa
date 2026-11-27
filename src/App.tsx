@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { RoutineView } from './routine/RoutineView';
+import {startRoutineSync,requestSync} from './routine/sync';
+import { RoutineReminder } from './routine/RoutineReminder';
 import { bogotaToday, formatCOP, savingsStreak } from './savings/calculations';
 import type { Movement, MovementType } from './savings/types';
 import { removeMovement, restoreSnapshot, saveFinalGoal, saveMonthlyPlan, saveMovement } from './savings/storage';
@@ -16,9 +19,9 @@ import { CountdownDialog, EventDialog, QuickAdd, TaskDialog } from './components
 import { FinanceView, FinanceDialog } from './components/FinanceView';
 import { CalendarView, HomeView, TasksView, type Filter } from './components/PersonalViews';
 
-type Tab='home'|'calendar'|'savings'|'tasks';
-const tabFromHash=(hash:string):Tab=>hash==='#alcancia'||hash==='#ahorros'||hash==='#dinero'||hash==='#gastos'?'savings':hash==='#calendario'?'calendar':hash==='#tareas'?'tasks':'home';
-const tabHash=(tab:Tab)=>tab==='savings'?'#alcancia':tab==='calendar'?'#calendario':tab==='tasks'?'#tareas':'#inicio';
+type Tab='home'|'calendar'|'savings'|'tasks'|'routine';
+const tabFromHash=(hash:string):Tab=>hash==='#rutina'?'routine':hash==='#alcancia'||hash==='#ahorros'||hash==='#dinero'||hash==='#gastos'?'savings':hash==='#calendario'?'calendar':hash==='#tareas'?'tasks':'home';
+const tabHash=(tab:Tab)=>tab==='routine'?'#rutina':tab==='savings'?'#alcancia':tab==='calendar'?'#calendario':tab==='tasks'?'#tareas':'#inicio';
 type Overlay=
  |{kind:'movement';type:MovementType;movement?:Movement}|{kind:'detail';movement:Movement}
  |{kind:'plan'|'goal'|'settings'|'quick'}
@@ -32,12 +35,15 @@ function TabIcon({tab}:{tab:Tab}){
     home:<><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></>,
     calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-13 4h3m3 0h2"/></>,
     savings:<><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 10h18M15 15h3"/></>,
+    routine:<><path d="M12 3v18M3 12h18"/></>,
     tasks:<><path d="m4 7 2 2 3-4m3 2h8M4 16l2 2 3-4m3 2h8"/></>
   };
   return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[tab]}</svg>;
 }
 
 export default function App(){
+  useEffect(startRoutineSync,[]);
+  useEffect(()=>{document.body.classList.add('routine-winter');document.body.style.setProperty('--routine-winter-gif',`url(${import.meta.env.BASE_URL}routine/winter.gif)`);document.body.style.setProperty('--routine-winter-still',`url(${import.meta.env.BASE_URL}routine/winter.webp)`);return()=>{document.body.classList.remove('routine-winter');document.body.style.removeProperty('--routine-winter-gif');document.body.style.removeProperty('--routine-winter-still');};},[]);
   const [snapshot,setSnapshot]=useState<PersonalSnapshot|null>(null);
   const [loadError,setLoadError]=useState('');const [today,setToday]=useState(bogotaToday);
   const [tab,setTab]=useState<Tab>(()=>tabFromHash(location.hash));
@@ -91,7 +97,8 @@ export default function App(){
   async function savePlan(value:number|null){await commitAndRefresh(()=>saveMonthlyPlan(value));setOverlay(null);setMessage('Plan guardado');}
   async function saveGoal(value:number|null){await commitAndRefresh(()=>saveFinalGoal(value));setOverlay(null);setMessage(value===null?'Meta eliminada':'Meta guardada');}
   async function restore(backup:ParsedBackup){
-    await commitAndRefresh(()=>backup.kind==='full'?restoreFullBackup(backup.data,backup.preserveFinance):restoreSnapshot(backup.savings));
+    await commitAndRefresh(()=>backup.kind==='full'?restoreFullBackup(backup.data,backup.preserveFinance,backup.routine):restoreSnapshot(backup.savings));
+    requestSync();
     setNewId(null);setOverlay(null);setMessage(backup.kind==='full'?'Copia restaurada':'Ahorros restaurados; agenda conservada');
   }
   async function remove(m:Movement){if(removing)return;setRemoving(true);setRemoveError('');try{await commitAndRefresh(()=>removeMovement(m.id));setOverlay(null);setNewId(null);setMessage('Movimiento eliminado');}catch(e){setRemoveError(e instanceof Error?e.message:'No se pudo eliminar.');}finally{setRemoving(false);}}
@@ -124,8 +131,9 @@ export default function App(){
   const selectedCountdown=overlay?.kind==='countdown'?snapshot?.countdowns.find(c=>c.id===overlay.countdown?.id):undefined;
   return <div className="app-shell">
     <header className="app-header"><div><button type="button" className="wordmark" onClick={()=>navigate('home')} aria-label="Ir a Inicio">aiden<span>.</span></button><p className="header-date">{label}</p></div><button type="button" className="icon-button settings-button" aria-label="Ajustes y copias de seguridad" disabled={!snapshot} onClick={()=>setOverlay({kind:'settings'})}><Icon name="settings"/></button></header>
-    <main id="main-content">{loadError?<section role="alert" className="load-error"><h1>No pudimos leer tus datos</h1><p>{loadError}</p><p>No se ha borrado ningún registro.</p><button className="button-primary" onClick={()=>void refresh()}>Reintentar</button></section>
+    {snapshot&&!loadError&&!overlay&&tab!=='routine'&&<RoutineReminder onOpen={()=>navigate('routine')}/>}<main id="main-content">{snapshot&&!loadError&&tab==='home'&&<button type="button" className="routine-entry" onClick={()=>navigate('routine')}><span><strong>Rutina</strong><small>Ver lo que sigue</small></span><span aria-hidden="true">›</span></button>}{loadError?<section role="alert" className="load-error"><h1>No pudimos leer tus datos</h1><p>{loadError}</p><p>No se ha borrado ningún registro.</p><button className="button-primary" onClick={()=>void refresh()}>Reintentar</button></section>
       :!snapshot?<p role="status" className="loading-label">Cargando datos locales…</p>
+      :tab==='routine'?<RoutineView onBack={()=>navigate('home')}/>
       :tab==='home'?<HomeView data={snapshot} today={today} streakCelebrate={streakCelebrate} onSavings={()=>{setMoneyPane('savings');navigate('savings');}} onFinance={()=>{setMoneyPane('finance');navigate('savings');}} onCalendar={()=>navigate('calendar')} onTasks={()=>navigate('tasks')} onAddEvent={()=>setOverlay({kind:'event',date:today})} onOpenEvent={o=>setOverlay({kind:'event',event:o.event,occurrence:o,date:o.startDate})} onOpenTask={task=>setOverlay({kind:'task',task})} onTaskToggle={t=>void toggleTask(t)} onCountdown={countdown=>setOverlay({kind:'countdown',countdown})} onAddCountdown={()=>setOverlay({kind:'countdown'})}/>
       :tab==='calendar'?<CalendarView data={snapshot} today={today} month={calendarMonth} onMonth={setCalendarMonth} selected={selectedDay} onSelect={setSelectedDay} filter={calendarFilter} onFilter={setCalendarFilter} onAddEvent={date=>setOverlay({kind:'event',date})} onOpenEvent={o=>setOverlay({kind:'event',event:o.event,occurrence:o,date:o.startDate})} onOpenTask={task=>setOverlay({kind:'task',task})} onTaskToggle={t=>void toggleTask(t)} onOpenCountdown={countdown=>setOverlay({kind:'countdown',countdown})} onAddCountdown={()=>setOverlay({kind:'countdown'})}/>
       :tab==='savings'?<div className="view-panel money-hub"><div className="money-header"><h1>Dinero</h1><p className="field-hint">Alcancía y movimientos personales, por separado.</p></div><div className="money-switch" role="group" aria-label="Sección de Dinero">
@@ -135,7 +143,7 @@ export default function App(){
       <FinanceView data={snapshot} today={today} onAdd={direction=>setOverlay({kind:'finance',direction})} onEdit={entry=>setOverlay({kind:'finance',entry,direction:entry.kind})} onOpenOccurrence={openRealFinance}/>}</div>
       :<TasksView tasks={snapshot.tasks} today={today} onOpen={task=>setOverlay({kind:'task',task})} onAdd={()=>setOverlay({kind:'task'})} onToggle={t=>void toggleTask(t)}/>}
     </main>
-    {snapshot&&!overlay&&<nav className={`bottom-nav nav-${tab}`} aria-label="Navegación principal">{(['home','calendar'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='home'?'Inicio':'Calendario'}</span></button>)}
+    {snapshot&&!overlay&&<nav className={`bottom-nav nav-${tab==='routine'?'home':tab}`} aria-label="Navegación principal">{(['home','calendar'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key||(tab==='routine'&&key==='home')?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='home'?'Inicio':'Calendario'}</span></button>)}
       <button className="bottom-add" type="button" aria-label="Añadir" onClick={()=>setOverlay({kind:'quick'})}><Icon name="plus"/></button>
       {(['savings','tasks'] as const).map(key=><button key={key} type="button" className={`bottom-tab ${tab===key?'current':''}`} aria-current={tab===key?'page':undefined} onClick={()=>navigate(key)}><TabIcon tab={key}/><span>{key==='savings'?'Dinero':'Tareas'}</span></button>)}</nav>}
     {needRefresh&&!overlay&&<aside className="update-banner"><span>Hay una versión nueva.</span><button type="button" className="text-action" onClick={()=>void updateServiceWorker(true)}>Actualizar</button></aside>}

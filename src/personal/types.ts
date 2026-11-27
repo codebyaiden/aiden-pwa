@@ -42,3 +42,7 @@ export interface BackupV4 extends PersonalSnapshot {
   format: 'aiden.personal.backup'; version: 4; exportedAt: string;
 }
 export type Occurrence = { event: CalendarEvent; startDate: string; endDate: string; key: string };
+
+export interface BackupV5 extends Omit<BackupV4,'version'> {
+  version:5;routine:import('../routine/engine').State;
+}

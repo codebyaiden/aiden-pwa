@@ -1,0 +1,13 @@
+[Unit]
+Description=Create and verify an encrypted aiden. Routine backup
+ConditionPathExists=/var/lib/aiden-routine/routine.sqlite
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/bin/sh -ec '/usr/bin/node /opt/aiden-routine/backup.mjs create /var/lib/aiden-routine/routine.sqlite /var/backups/aiden-routine/"$(date -u +%%F)".enc /etc/aiden-routine/recovery.key'
+ExecStartPost=/usr/bin/find /var/backups/aiden-routine -maxdepth 1 -type f -name '*.enc' -mtime +29 -delete
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/backups/aiden-routine /var/lib/private/aiden-routine

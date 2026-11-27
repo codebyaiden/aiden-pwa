@@ -9,3 +9,8 @@ coverage/
 .DS_Store
 # Personal backups never belong in source control.
 aiden-alcancia-*.json
+aiden-copia-*.json
+aiden-personal.json
+aiden-review.json
+
+/backend/dist/

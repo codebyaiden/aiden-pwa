@@ -1,3 +1,5 @@
+import type {State} from '../routine/engine';
+import {validateRoutine} from '../routine/schema';
 import { bogotaToday } from '../savings/calculations';
 import { loadSnapshot, request, transaction } from '../savings/storage';
 import { validateLedger, validateSettings } from '../savings/validation';
@@ -155,12 +157,14 @@ export async function removeFinanceEntry(id:string){
     store.delete(id);
   });
 }
-export async function restoreFullBackup(backup:BackupV4,preserveFinance=false){
+export async function restoreFullBackup(backup:BackupV4,preserveFinance=false,routine?:State){
   validateLedger(backup.movements,bogotaToday());
   if(!validateSettings(backup.settings))throw new Error('La configuración del respaldo no es válida.');
   validatePersonalCollections(backup);
   validateFinanceEntries(backup.financeEntries,bogotaToday());
-  await transaction('readwrite',stores,async tx=>{
+  const restored=routine?validateRoutine(routine):undefined;
+  await transaction('readwrite',restored?[...stores,'routine']:stores,async tx=>{
+    if(restored)tx.objectStore('routine').put(restored,'state');
     // A v3 backup predates real finance. Preserve existing entries, unlinking them
     // because restored calendar rules may differ from the current ones.
     let retained:FinanceEntry[]=[];

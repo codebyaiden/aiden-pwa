@@ -33,7 +33,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        importScripts: ['routine/push.js'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,gif,webp}'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: false
