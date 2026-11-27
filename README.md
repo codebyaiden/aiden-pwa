@@ -41,3 +41,7 @@ Prueba en el iPhone real: instalar desde Safari, guardar/reabrir con modo avión
 - Los registros reales sobreviven a la eliminación de una serie, pero pierden su vínculo con el evento.
 - Backup integral `aiden.personal.backup` v4. Una importación v3 conserva los registros reales actuales y les retira los vínculos de calendario; las copias de ahorros v1/v2 preservan la agenda y los registros de gastos/ingresos.
 - Hay un documento opcional `VPS_HANDOFF.md` para un futuro servicio de Web Push. **v1.3 no instala backend ni ofrece push**, solo avisos dentro de la PWA al abrirla.
+
+## Rutina
+
+Aplicación integrada con progreso sin conexión y conexión opcional al VPS. Consulta la [instalación en iPhone, Atajos y recuperación](backend/SETUP.md).
