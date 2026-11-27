@@ -43,7 +43,7 @@ function TabIcon({tab}:{tab:Tab}){
 
 export default function App(){
   useEffect(startRoutineSync,[]);
-  useEffect(()=>{document.body.classList.add('routine-winter');document.body.style.setProperty('--routine-winter-gif',`url(${import.meta.env.BASE_URL}routine/winter.gif)`);document.body.style.setProperty('--routine-winter-still',`url(${import.meta.env.BASE_URL}routine/winter.webp)`);return()=>{document.body.classList.remove('routine-winter');document.body.style.removeProperty('--routine-winter-gif');document.body.style.removeProperty('--routine-winter-still');};},[]);
+  useEffect(()=>{document.body.classList.add('routine-winter');document.body.style.setProperty('--routine-winter-gif',`url(${import.meta.env.BASE_URL}routine/winter-half.gif)`);document.body.style.setProperty('--routine-winter-still',`url(${import.meta.env.BASE_URL}routine/winter.webp)`);return()=>{document.body.classList.remove('routine-winter');document.body.style.removeProperty('--routine-winter-gif');document.body.style.removeProperty('--routine-winter-still');};},[]);
   const [snapshot,setSnapshot]=useState<PersonalSnapshot|null>(null);
   const [loadError,setLoadError]=useState('');const [today,setToday]=useState(bogotaToday);
   const [tab,setTab]=useState<Tab>(()=>tabFromHash(location.hash));
