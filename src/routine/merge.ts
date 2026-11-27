@@ -4,7 +4,7 @@ import type {Run,State} from './engine';
 const equal=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 export function mergeRoutine(base:State, local:State, remote:State):State {
   const next={...remote,runs:{...remote.runs}};
-  for(const key of Object.keys(local) as (keyof State)[]){
+  for(const key of new Set([...Object.keys(base),...Object.keys(local)]) as Set<keyof State>){
     if(key==='runs'||key==='history'||key==='syncPush'||equal(base[key],local[key]))continue;
     if(key==='context'&&remote.context&&local.context&&remote.context.at>local.context.at)continue;
     if(key==='wake'&&remote.wake&&local.wake&&remote.wake.at>local.wake.at)continue;

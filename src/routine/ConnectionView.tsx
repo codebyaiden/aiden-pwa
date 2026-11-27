@@ -8,6 +8,7 @@ const deliveryLabels:Record<string,string>={accepted:'Aceptado por el proveedor'
 export function ConnectionView(){
   const [token,setToken]=useState(''),[connected,setConnected]=useState(()=>!!accessToken());
   const [push,setPush]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState('');
+  const [vapid,setVapid]=useState('');
   const [history,setHistory]=useState<Delivery[]>([]);
   useEffect(()=>{
     if(!connected)return;
@@ -17,7 +18,7 @@ export function ConnectionView(){
         const [settings,entries]=await Promise.all([api<Status>('status'),api<Delivery[]>('history')]);
         const registration=await navigator.serviceWorker?.getRegistration();
         const sub=await registration?.pushManager?.getSubscription();
-        if(active){setPush(settings.push&&!!sub);setHistory(entries);}
+        if(active){setPush(settings.push&&!!sub);setVapid(settings.vapid);setHistory(entries);}
       }catch{if(active)setStatus('Sin conexión con Rutina.');}
     }
     void refresh();
@@ -33,7 +34,8 @@ export function ConnectionView(){
     e.preventDefault();
     void act(async()=>{
       const secret=token.trim();
-      await api<Status>('status',{},secret);
+      const settings=await api<Status>('status',{},secret);
+      setVapid(settings.vapid);
       storeToken(secret);
       setConnected(true);setToken('');
       await syncRoutine();
@@ -44,11 +46,10 @@ export function ConnectionView(){
     void act(async()=>{
       if(!('Notification' in window)||!('PushManager' in window)||!navigator.serviceWorker)throw new Error('En iPhone, abre aiden. desde la pantalla de inicio.');
       if(await Notification.requestPermission()!=='granted')throw new Error('Permite las notificaciones en los ajustes del dispositivo.');
-      const settings=await api<Status>('status');
       const registration=await navigator.serviceWorker.getRegistration();
       if(!registration?.active)throw new Error('Vuelve a abrir aiden. cuando termine de instalarse.');
       const existing=await registration.pushManager.getSubscription();
-      const sub=existing??await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:settings.vapid});
+      const sub=existing??await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:vapid});
       await api('subscription',{method:'POST',body:JSON.stringify(sub)});
       setPush(true);
       await syncRoutine();
@@ -74,7 +75,7 @@ export function ConnectionView(){
       <button className="routine-primary" disabled={busy}>Conectar</button>
     </form>:<div className="routine-form">
       <p className="routine-muted">Rutina puede sincronizarse con el servidor. El calendario y las finanzas permanecen en este dispositivo.</p>
-      <button className="routine-primary" disabled={busy} onClick={push?()=>disconnect(true):enable}>{push?'Desactivar avisos push':'Activar avisos push'}</button>
+      <button className="routine-primary" disabled={busy||!vapid} onClick={push?()=>disconnect(true):enable}>{push?'Desactivar avisos push':'Activar avisos push'}</button>
       {push&&<button disabled={busy} onClick={()=>void act(async()=>{
         const response=await api<{status:string}>('test',{method:'POST'});
         setStatus(deliveryLabels[response.status]??'Estado desconocido');

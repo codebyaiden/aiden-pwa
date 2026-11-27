@@ -159,12 +159,13 @@ async function deliver(sub,payload){
   }
 }
 
+const runDeliveryId=run=>`${run.key}:${run.next}:${run.retries}`;
 function dueItem(s,now){
   if(!s.started||!s.reminders||s.mode==='vacation'||quietNow(s,now)||activeContext(s,now)==='sleeping')return null;
-  const due=reminder(s,now);
+  const due=reminder(s,now,run=>eligible(runDeliveryId(run),now));
   if(due){
     const run=s.runs[due.key];
-    return {id:`${due.key}:${run.next}:${run.retries}`,key:due.key,expected:run.next,cutoff:cutoffAt(s.routines.find(r=>r.id===run.routineId),run),body:due.text};
+    return {id:runDeliveryId(run),key:due.key,expected:run.next,cutoff:cutoffAt(s.routines.find(r=>r.id===run.routineId),run),body:due.text};
   }
   const day=dateAt(now);
   if(now<at(day,720)||now>=at(day,1200))return null;

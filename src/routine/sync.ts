@@ -11,10 +11,12 @@ let lastPush=0;
 export function pushAvailable(){return navigator.onLine&&Date.now()-lastPush<60000;}
 export async function api<T>(path:string,options:RequestInit={},token=accessToken()):Promise<T>{
   if(!token)throw new Error('Conecta la rutina primero.');
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),12000);
   const response=await fetch(apiBase+'/v1/'+path,{
-    ...options,cache:'no-store',signal:AbortSignal.timeout(12000),
+    ...options,cache:'no-store',signal:controller.signal,
     headers:{Authorization:'Bearer '+token,...(options.body?{'Content-Type':'application/json'}:{})}
-  });
+  }).finally(()=>clearTimeout(timeout));
   if(!response.ok)throw new Error(response.status===401?'La clave de acceso no es válida.':'No se pudo comunicar con Rutina.');
   return response.json();
 }
@@ -29,8 +31,8 @@ async function performSync(){
   const serialized=JSON.stringify(local), dirty=local&&serialized!==JSON.stringify(base);
   const remote=validateRoutine(await api('sync',dirty?{method:'POST',body:JSON.stringify({base:base??initial(),local})}:{},token));
   if(accessToken()!==token)return;
-  const sub=remote.syncPush&&(await navigator.serviceWorker?.getRegistration())?
-    await (await navigator.serviceWorker.getRegistration())?.pushManager?.getSubscription():null;
+  const registration=remote.syncPush?await navigator.serviceWorker?.getRegistration():undefined;
+  const sub=await registration?.pushManager?.getSubscription();
   lastPush=sub?Date.now():0;
   let updated=false;
   await transaction('readwrite',['routine'],async tx=>{
